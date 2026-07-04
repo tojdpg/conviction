@@ -198,8 +198,8 @@
             <th class="px-4 py-3 text-right" onclick="sortTable('analyst_upside')">Kursziel</th>
             <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('spread')">Streuung</th>
             <th class="px-4 py-3 text-center sparkline-cell">Verlauf</th>
-            <th class="px-4 py-3 text-center sparkline-cell hide-mobile">12M</th>
-            <th class="px-2 py-3 text-center sparkline-cell hide-mobile">5J</th>
+            <th class="px-4 py-3 text-center sparkline-cell">12M</th>
+            <th class="px-2 py-3 text-center sparkline-cell">5J</th>
           </tr>
         </thead>
         <tbody id="portfolio-table"></tbody>
@@ -224,8 +224,8 @@
               <th class="px-2 py-3 text-right">Kursziel</th>
               <th class="px-2 py-3 text-right hide-mobile">Streuung</th>
               <th class="px-2 py-3 text-center sparkline-cell">Verlauf</th>
-              <th class="px-2 py-3 text-center sparkline-cell hide-mobile">12M</th>
-              <th class="px-2 py-3 text-center sparkline-cell hide-mobile">5J</th>
+              <th class="px-2 py-3 text-center sparkline-cell">12M</th>
+              <th class="px-2 py-3 text-center sparkline-cell">5J</th>
             </tr>
           </thead>
           <tbody id="watchlist-table"></tbody>
@@ -627,7 +627,7 @@ function renderTable() {
           <canvas id="spark-big-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}"></canvas>
         </div>
       </td>
-      <td class="px-4 py-3 text-center sparkline-cell hide-mobile">
+      <td class="px-4 py-3 text-center sparkline-cell">
         <canvas id="spark12m-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}"></canvas>
         <div class="spark-ath-marker">12M</div>
         <div class="spark-popup">
@@ -635,7 +635,7 @@ function renderTable() {
           <div class="legend"><span style="color:#22c55e">● Kurs</span><span style="color:#eab308">● SMA 50</span><span style="color:#fff">● SMA 200</span></div>
         </div>
       </td>
-      <td class="px-2 py-3 text-center sparkline-cell hide-mobile">
+      <td class="px-2 py-3 text-center sparkline-cell">
         <canvas id="spark5y-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}"></canvas>
         <div class="spark-popup">
           <canvas id="spark5y-big-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}"></canvas>
