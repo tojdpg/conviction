@@ -1,0 +1,10 @@
+# personal data — never commit
+config.json
+prices.db*
+.cache.pkl
+
+.venv/
+__pycache__/
+*.db
+*.log
+data/

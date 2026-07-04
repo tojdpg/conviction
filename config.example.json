@@ -1,0 +1,71 @@
+{
+  "portfolio": [
+    {"name": "Apple",                   "ticker": "AAPL",    "shares": 10,   "currency": "USD"},
+    {"name": "Microsoft",               "ticker": "MSFT",    "shares": 5,    "currency": "USD"},
+    {"name": "NVIDIA",                  "ticker": "NVDA",    "shares": 4,    "currency": "USD"},
+    {"name": "SAP",                     "ticker": "SAP.DE",  "shares": 15,   "currency": "EUR"},
+    {"name": "iShares Core MSCI World", "ticker": "IWDA.AS", "shares": 30,   "currency": "EUR"},
+    {"name": "Bitcoin",                 "ticker": "BTC-USD", "shares": 0.05, "currency": "USD"}
+  ],
+
+  "watchlist": [
+    {"name": "iShares Semiconductor", "ticker": "SOXX",   "currency": "USD"},
+    {"name": "Allianz",               "ticker": "ALV.DE", "currency": "EUR"},
+    {"name": "HSBC Holdings",         "ticker": "HSBA.L", "currency": "GBP"},
+    {"name": "Toyota",                "ticker": "7203.T", "currency": "JPY"}
+  ],
+
+  "manual_targets": {
+    "bitcoin": {
+      "as_of": "2026-06",
+      "source": "Konsens aus 5 Krypto-Quellen (CoinCodex, InvestingHaven, Coinpedia, Fundstrat, Standard Chartered)",
+      "target_6m": 85000,
+      "target_12m": 125000,
+      "target_low": 45000,
+      "target_high": 200000,
+      "tickers": ["BTC-USD", "BTCE.DE"]
+    },
+    "gold": {
+      "as_of": "2026-06",
+      "source": "Gold-Analysten-Konsens (Morgan Stanley, RBC, JPM, GS, BofA)",
+      "target_low_usd": 5200,
+      "target_mean_usd": 5723,
+      "target_high_usd": 6000,
+      "spot_ticker": "GC=F",
+      "tickers": ["EWG2.SG"]
+    }
+  },
+
+  "etf_targets": {
+    "SXRV.DE": {"name": "NASDAQ 100", "holdings": [
+      ["NVDA", 0.10], ["MSFT", 0.09], ["AAPL", 0.10], ["AMZN", 0.05],
+      ["META", 0.05], ["GOOGL", 0.04], ["AVGO", 0.04], ["TSLA", 0.03],
+      ["COST", 0.02], ["NFLX", 0.02]
+    ]},
+    "IWDA.AS": {"name": "MSCI World", "holdings": [
+      ["NVDA", 0.04], ["MSFT", 0.04], ["AAPL", 0.04], ["AMZN", 0.02],
+      ["META", 0.02], ["GOOGL", 0.02], ["AVGO", 0.015], ["TSLA", 0.01],
+      ["JPM", 0.01], ["LLY", 0.01]
+    ]},
+    "EXCH.SW": {"name": "MSCI EM ex China", "holdings": [
+      ["TSM", 0.20], ["005930.KS", 0.04], ["INFY", 0.04], ["RELIANCE.NS", 0.03],
+      ["ICICIBANK.NS", 0.03], ["VALE", 0.03], ["PBR", 0.03], ["NPN.JO", 0.02],
+      ["HDB", 0.02], ["IBN", 0.02]
+    ]},
+    "SOXX": {"name": "SOXX Semiconductor", "holdings": [
+      ["NVDA", 0.10], ["AVGO", 0.09], ["AMD", 0.07], ["TXN", 0.05],
+      ["QCOM", 0.05], ["INTC", 0.04], ["MU", 0.04], ["MRVL", 0.03],
+      ["ADI", 0.03], ["LRCX", 0.03]
+    ]},
+    "HACK": {"name": "HACK Cyber Security", "holdings": [
+      ["CRWD", 0.10], ["PANW", 0.09], ["FTNT", 0.08], ["ZS", 0.07],
+      ["OKTA", 0.05], ["CYBR", 0.04], ["S", 0.04], ["NET", 0.04],
+      ["DDOG", 0.03], ["GEN", 0.03]
+    ]},
+    "LIT": {"name": "LIT Lithium", "holdings": [
+      ["300750.SZ", 0.08], ["ALB", 0.09], ["SQM", 0.08], ["002460.SZ", 0.07],
+      ["002466.SZ", 0.07], ["PLS.AX", 0.06], ["MIN.AX", 0.05], ["LAC", 0.04],
+      ["SGML", 0.04], ["PLL", 0.03]
+    ]}
+  }
+}

@@ -1,0 +1,333 @@
+"""
+Flatex Depot Tracker — Backend
+Positions live in config.json; market data logic in marketdata.py.
+API schema is unchanged from the original tracker, so index.html works as-is.
+"""
+
+import os
+import threading
+from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
+import yfinance as yf
+
+import marketdata as md
+from marketdata import PORTFOLIO, WATCHLIST, convert_to_eur, sanitize
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+@asynccontextmanager
+async def lifespan(app):
+    def _prefetch_all():
+        md.refresh_history(md.all_tickers(), force=True)
+        md.get_fx_rates()
+        items = [(p["ticker"], p["currency"]) for p in PORTFOLIO] + \
+                [(w["ticker"], w["currency"]) for w in WATCHLIST]
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futs = [ex.submit(md.get_stock_data, t, c) for t, c in items]
+            for f in as_completed(futs):
+                try:
+                    f.result()
+                except Exception:
+                    pass
+    threading.Thread(target=_prefetch_all, daemon=True).start()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+md.init_db()
+
+
+@app.get("/api/portfolio-lite")
+def get_portfolio_lite():
+    """Fast endpoint: prices + FX only. Serves from cache, fetches only misses."""
+    rates = md.get_fx_rates()
+
+    def fetch_price(pos):
+        cached = md.cache_peek(pos["ticker"])
+        if cached and cached.get("current_price"):
+            keys = ("current_price", "ticker_currency", "short_name",
+                    "recommendation", "kgv", "kvb")
+            return pos, {k: cached.get(k) for k in keys}
+        info = md.fetch_info(pos["ticker"], retries=1)
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose")
+        return pos, {
+            "current_price": float(price) if price else None,
+            "ticker_currency": info.get("currency", pos["currency"]),
+            "short_name": info.get("shortName", pos["ticker"]),
+            "recommendation": info.get("recommendationKey"),
+            "kgv": info.get("trailingPE") or info.get("forwardPE"),
+            "kvb": info.get("priceToBook"),
+        }
+
+    fetched = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for f in as_completed([ex.submit(fetch_price, p) for p in PORTFOLIO]):
+            pos, data = f.result()
+            fetched[pos["ticker"]] = data
+
+    results, total_value = [], 0.0
+    for pos in PORTFOLIO:
+        data = fetched.get(pos["ticker"], {})
+        price = data.get("current_price")
+        ccy = data.get("ticker_currency", pos["currency"])
+        price_eur = convert_to_eur(price, ccy, rates) if price else 0
+        value_eur = pos["shares"] * price_eur
+        total_value += value_eur
+        results.append({**pos, **data,
+                        "price_eur": round(price_eur, 2),
+                        "value_eur": round(value_eur, 2),
+                        "pct_of_portfolio": 0})
+    for r in results:
+        if total_value > 0:
+            r["pct_of_portfolio"] = round(r["value_eur"] / total_value * 100, 2)
+    results.sort(key=lambda x: -x["value_eur"])
+
+    return JSONResponse(sanitize({
+        "portfolio": results,
+        "total_value_eur": round(total_value, 2),
+        "eurusd": rates["EURUSD=X"],
+        "timestamp": datetime.now().isoformat(),
+        "lite": True,
+    }))
+
+
+def _find_close_for_days(history, days):
+    """Close ~N days ago; oldest close if history covers >=90% of the span."""
+    target = str((datetime.now() - timedelta(days=days)).date())
+    close = None
+    for h in history:
+        if h["date"] <= target:
+            close = h["close"]
+        else:
+            break
+    if close is None and history:
+        oldest_days = (datetime.now().date()
+                       - datetime.strptime(history[0]["date"], "%Y-%m-%d").date()).days
+        if oldest_days >= days * 0.9:
+            close = history[0]["close"]
+    return close
+
+
+@app.get("/api/portfolio")
+def get_portfolio():
+    """Full portfolio: analyst data, signals, watchlist, period performance."""
+    rates = md.get_fx_rates()
+    md.refresh_history(md.all_tickers())  # no-op if refreshed <15 min ago
+
+    fetched = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(md.get_stock_data, p["ticker"], p["currency"], "2y"): p
+                for p in PORTFOLIO}
+        for f in as_completed(futs):
+            fetched[futs[f]["ticker"]] = f.result()
+
+    results, total_value = [], 0.0
+    for pos in PORTFOLIO:
+        data = fetched[pos["ticker"]]
+        price = data.get("current_price")
+        ccy = data.get("ticker_currency", pos["currency"])
+        price_eur = convert_to_eur(price, ccy, rates) if price else 0
+        value_eur = pos["shares"] * price_eur
+        total_value += value_eur
+        results.append({**pos, **data,
+                        "price_eur": round(price_eur, 2),
+                        "value_eur": round(value_eur, 2),
+                        "pct_of_portfolio": 0})
+    for r in results:
+        if total_value > 0:
+            r["pct_of_portfolio"] = round(r["value_eur"] / total_value * 100, 2)
+    results.sort(key=lambda x: -x["value_eur"])
+
+    # Period performance from FULL stored history (36M/48M need >2y of data)
+    periods = {"1d": 1, "7d": 7, "1m": 30, "3m": 91, "6m": 182,
+               "12m": 365, "24m": 730, "36m": 1095, "48m": 1460}
+    totals = {k: 0.0 for k in periods}
+    for pos in PORTFOLIO:
+        data = fetched[pos["ticker"]]
+        full_hist = md.history_rows(pos["ticker"])
+        if not full_hist:
+            continue
+        ccy = data.get("ticker_currency", pos["currency"])
+        for key, days in periods.items():
+            if key == "1d":
+                close = full_hist[-2]["close"] if len(full_hist) >= 2 else full_hist[-1]["close"]
+            else:
+                close = _find_close_for_days(full_hist, days)
+            if close:
+                totals[key] += pos["shares"] * convert_to_eur(close, ccy, rates)
+
+    changes = {}
+    for key in periods:
+        t = totals[key]
+        changes[f"change_{key}_eur"] = round(total_value - t, 2) if t else None
+        changes[f"change_{key}_pct"] = round((total_value / t - 1) * 100, 2) if t else None
+
+    fetched_wl = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = {ex.submit(md.get_stock_data, w["ticker"], w["currency"], "1y"): w
+                for w in WATCHLIST}
+        for f in as_completed(futs):
+            fetched_wl[futs[f]["ticker"]] = f.result()
+
+    watchlist_results = []
+    for w in WATCHLIST:
+        data = fetched_wl[w["ticker"]]
+        price = data.get("current_price")
+        ccy = data.get("ticker_currency", w["currency"])
+        price_eur = convert_to_eur(price, ccy, rates) if price else None
+        watchlist_results.append({**w, **data,
+                                  "price_eur": round(price_eur, 2) if price_eur else None})
+
+    return JSONResponse(sanitize({
+        "portfolio": results,
+        "watchlist": watchlist_results,
+        "total_value_eur": round(total_value, 2),
+        **changes,
+        "eurusd": rates["EURUSD=X"],
+        "timestamp": datetime.now().isoformat(),
+    }))
+
+
+class NewPosition(BaseModel):
+    ticker: str
+    shares: float | None = None  # None/0 -> watchlist, >0 -> portfolio
+    name: str | None = None
+
+
+@app.post("/api/positions")
+def add_position(body: NewPosition):
+    """Validate the ticker against Yahoo, then persist to config.json."""
+    ticker = body.ticker.strip().upper()
+    if not ticker:
+        raise HTTPException(400, "Ticker fehlt")
+    info = md.fetch_info(ticker, retries=1)
+    price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose")
+    if not price:
+        raise HTTPException(404, f"Ticker '{ticker}' bei Yahoo Finance nicht gefunden")
+    currency = info.get("currency") or "USD"
+    name = (body.name or "").strip() or info.get("shortName") or ticker
+
+    if body.shares and body.shares > 0:
+        list_name = "portfolio"
+        entry = {"name": name, "ticker": ticker, "shares": body.shares, "currency": currency}
+    else:
+        list_name = "watchlist"
+        entry = {"name": name, "ticker": ticker, "currency": currency}
+
+    if not md.add_position(list_name, entry):
+        raise HTTPException(409, f"'{ticker}' ist bereits in der Liste")
+
+    def _warm():
+        try:
+            md.refresh_history([ticker], force=True)
+            md.get_stock_data(ticker, currency)
+        except Exception:
+            pass
+    threading.Thread(target=_warm, daemon=True).start()
+
+    return {"ok": True, "list": list_name, "ticker": ticker,
+            "name": name, "currency": currency}
+
+
+@app.delete("/api/positions/{list_name}/{ticker}")
+def delete_position(list_name: str, ticker: str):
+    if list_name not in ("portfolio", "watchlist"):
+        raise HTTPException(400, "Liste muss 'portfolio' oder 'watchlist' sein")
+    if not md.remove_position(list_name, ticker):
+        raise HTTPException(404, f"'{ticker}' nicht in {list_name} gefunden")
+    return {"ok": True}
+
+
+@app.get("/api/history/{ticker}")
+def get_history(ticker: str, period: str = "2y"):
+    """Historical closes, from the local store (Yahoo fallback for unknowns)."""
+    period_days = {"1m": 30, "3m": 91, "6m": 182, "1y": 365, "2y": 730,
+                   "5y": 1825, "max": None}
+    days = period_days.get(period, 730)
+    rows = md.history_rows(ticker, days=days)
+    if rows:
+        return JSONResponse({"ticker": ticker,
+                             "data": [{"date": r["date"], "close": round(r["close"], 2)}
+                                      for r in rows]})
+    try:
+        hist = yf.Ticker(ticker).history(period=period)
+        data = [{"date": str(d.date()), "close": round(float(row["Close"]), 2)}
+                for d, row in hist.iterrows()]
+        return JSONResponse({"ticker": ticker, "data": data})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/analysts/{ticker}")
+def get_analyst_detail(ticker: str):
+    """Detailed analyst info for one instrument."""
+    try:
+        info = md.fetch_info(ticker)
+        rates = md.get_fx_rates()
+        ccy = info.get("currency", "USD")
+
+        rec_data = []
+        try:
+            recs = yf.Ticker(ticker).recommendations
+            if recs is not None and len(recs) > 0:
+                for idx, row in recs.tail(20).iterrows():
+                    rec_data.append({
+                        "date": str(idx),
+                        "firm": str(row.get("Firm", "")),
+                        "to_grade": str(row.get("To Grade", "")),
+                        "from_grade": str(row.get("From Grade", "")),
+                        "action": str(row.get("Action", "")),
+                    })
+        except Exception:
+            pass
+
+        def to_eur(val):
+            return round(convert_to_eur(float(val), ccy, rates), 2) if val is not None else None
+
+        return JSONResponse(sanitize({
+            "ticker": ticker,
+            "short_name": info.get("shortName", ticker),
+            "sector": info.get("sector", ""),
+            "industry": info.get("industry", ""),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "dividend_yield": info.get("dividendYield"),
+            "beta": info.get("beta"),
+            "52w_high": to_eur(info.get("fiftyTwoWeekHigh")),
+            "52w_low": to_eur(info.get("fiftyTwoWeekLow")),
+            "50d_avg": to_eur(info.get("fiftyDayAverage")),
+            "200d_avg": to_eur(info.get("twoHundredDayAverage")),
+            "analyst_target_low": to_eur(info.get("targetLowPrice")),
+            "analyst_target_mean": to_eur(info.get("targetMeanPrice")),
+            "analyst_target_high": to_eur(info.get("targetHighPrice")),
+            "analyst_target_median": to_eur(info.get("targetMedianPrice")),
+            "analyst_count": info.get("numberOfAnalystOpinions"),
+            "recommendation_key": info.get("recommendationKey"),
+            "recommendation_mean": info.get("recommendationMean"),
+            "earnings_growth": info.get("earningsGrowth"),
+            "revenue_growth": info.get("revenueGrowth"),
+            "profit_margins": info.get("profitMargins"),
+            "analyst_recommendations": rec_data,
+        }))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/")
+def serve_frontend():
+    with open(os.path.join(BASE_DIR, "index.html")) as f:
+        return HTMLResponse(f.read())
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app,
+                host=os.environ.get("HOST", "0.0.0.0"),
+                port=int(os.environ.get("PORT", "8080")))
