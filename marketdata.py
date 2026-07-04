@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import threading
 import time
+from contextlib import closing
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -207,18 +208,19 @@ _db_write_lock = threading.Lock()
 
 
 def _conn():
+    # NB: sqlite3's own context manager only wraps a transaction, it does NOT
+    # close the connection — always use `with closing(_conn())` or FDs leak.
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 
 def init_db():
-    with _db_write_lock:
-        with _conn() as conn:
-            conn.execute("""CREATE TABLE IF NOT EXISTS prices (
-                ticker TEXT NOT NULL, date TEXT NOT NULL,
-                close REAL NOT NULL, high REAL, low REAL,
-                PRIMARY KEY (ticker, date))""")
+    with _db_write_lock, closing(_conn()) as conn, conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS prices (
+            ticker TEXT NOT NULL, date TEXT NOT NULL,
+            close REAL NOT NULL, high REAL, low REAL,
+            PRIMARY KEY (ticker, date))""")
 
 
 def upsert_history(ticker, df):
@@ -235,9 +237,8 @@ def upsert_history(ticker, df):
                      float(l) if pd.notna(l) else None))
     if not rows:
         return
-    with _db_write_lock:
-        with _conn() as conn:
-            conn.executemany("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?)", rows)
+    with _db_write_lock, closing(_conn()) as conn, conn:
+        conn.executemany("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?)", rows)
 
 
 def history_rows(ticker, days=None):
@@ -248,20 +249,20 @@ def history_rows(ticker, days=None):
         q += " AND date >= ?"
         args.append(str((datetime.now() - timedelta(days=days)).date()))
     q += " ORDER BY date"
-    with _conn() as conn:
+    with closing(_conn()) as conn:
         rows = conn.execute(q, args).fetchall()
     return [{"date": r[0], "close": r[1], "high": r[2], "low": r[3]} for r in rows]
 
 
 def last_stored_date(ticker):
-    with _conn() as conn:
+    with closing(_conn()) as conn:
         row = conn.execute("SELECT MAX(date) FROM prices WHERE ticker = ?", (ticker,)).fetchone()
     return row[0] if row and row[0] else None
 
 
 def ath_row(ticker):
     """(high, date) of the true all-time high in the store."""
-    with _conn() as conn:
+    with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT high, date FROM prices WHERE ticker = ? AND high IS NOT NULL "
             "ORDER BY high DESC, date ASC LIMIT 1", (ticker,)).fetchone()
@@ -270,7 +271,7 @@ def ath_row(ticker):
 
 def eurusd_on(date_str):
     """EUR/USD close on or before a date (from stored history)."""
-    with _conn() as conn:
+    with closing(_conn()) as conn:
         row = conn.execute(
             "SELECT close FROM prices WHERE ticker = 'EURUSD=X' AND date <= ? "
             "ORDER BY date DESC LIMIT 1", (date_str,)).fetchone()
