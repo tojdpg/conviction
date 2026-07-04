@@ -91,7 +91,7 @@ def get_portfolio_lite():
     return JSONResponse(sanitize({
         "portfolio": results,
         "total_value_eur": round(total_value, 2),
-        "eurusd": rates["EURUSD=X"],
+        "eurusd": round(rates["EURUSD=X"], 4),
         "timestamp": datetime.now().isoformat(),
         "lite": True,
     }))
@@ -189,7 +189,7 @@ def get_portfolio():
         "watchlist": watchlist_results,
         "total_value_eur": round(total_value, 2),
         **changes,
-        "eurusd": rates["EURUSD=X"],
+        "eurusd": round(rates["EURUSD=X"], 4),
         "timestamp": datetime.now().isoformat(),
     }))
 

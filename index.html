@@ -9,6 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  /* page itself never scrolls sideways — wide content (table, perf bars) scrolls in its own container */
+  html, body { max-width: 100vw; overflow-x: hidden; }
+  #perf-bars { max-width: 100%; }
   .gain { color: #22c55e; }
   .loss { color: #ef4444; }
   .loading { animation: pulse 1.5s infinite; }
