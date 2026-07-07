@@ -30,6 +30,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "prices.db")
 CACHE_FILE = os.path.join(DATA_DIR, ".cache.pkl")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+THESES_FILE = os.path.join(DATA_DIR, "theses.json")
 
 if not os.path.exists(CONFIG_FILE):
     shutil.copyfile(os.path.join(BASE_DIR, "config.example.json"), CONFIG_FILE)
@@ -42,11 +43,59 @@ with open(CONFIG_FILE) as f:
 PORTFOLIO = CONFIG["portfolio"]
 WATCHLIST = CONFIG["watchlist"]
 
+DEFAULT_BUY_RULES = {
+    "rsi": {"buy_below": 30, "avoid_above": 70},
+    "kgv": {"cheap_below": 15, "expensive_above": 25},
+    "kbv": {"cheap_below": 1.5, "expensive_above": 3},
+    "vs_sma50": {"ideal_band": 2, "stretched_above": 8},
+    "ath": {"strong_buy_below": -50, "buy_band": [-30, -20]},
+}
+
+CURRENCY_SYMBOLS = {
+    "EUR": "€", "USD": "$", "GBP": "£", "JPY": "¥", "CHF": "CHF",
+    "CAD": "C$", "AUD": "A$", "SEK": "kr", "NOK": "kr", "DKK": "kr",
+}
+
 CACHE_TTL = 900        # fresh
 STALE_TTL = 3600       # stale but usable, refresh in background
 ETF_TARGET_TTL = 86400 # implied targets need ~10 .info calls each; refresh daily
 
 _config_lock = threading.Lock()
+_thesis_lock = threading.Lock()
+
+
+def get_base_currency():
+    return str(CONFIG.get("base_currency", "EUR") or "EUR").upper()
+
+
+def get_language():
+    return str(CONFIG.get("language", "de") or "de")
+
+
+def get_currency_symbol(currency=None):
+    currency = (currency or get_base_currency()).upper()
+    return CURRENCY_SYMBOLS.get(currency, currency)
+
+
+def get_buy_rules():
+    """Configurable threshold block, merged over safe defaults."""
+    rules = json.loads(json.dumps(DEFAULT_BUY_RULES))
+    for section, values in CONFIG.get("buy_rules", {}).items():
+        if isinstance(values, dict) and isinstance(rules.get(section), dict):
+            rules[section].update(values)
+        else:
+            rules[section] = values
+    return rules
+
+
+def get_public_config():
+    base = get_base_currency()
+    return {
+        "base_currency": base,
+        "symbol": get_currency_symbol(base),
+        "language": get_language(),
+        "buy_rules": get_buy_rules(),
+    }
 
 
 def _save_config():
@@ -75,6 +124,66 @@ def remove_position(list_name, ticker):
         lst[:] = kept
         _save_config()
     return True
+
+
+def _load_theses():
+    try:
+        with open(THESES_FILE) as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+    if isinstance(data, dict) and "items" in data and isinstance(data["items"], dict):
+        return data["items"]
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, list):
+        return {f"{x.get('ticker', '').upper()}::{x.get('author', '')}": x
+                for x in data if isinstance(x, dict) and x.get("ticker") and x.get("author")}
+    return {}
+
+
+def _save_theses(items):
+    with open(THESES_FILE, "w") as f:
+        json.dump({"items": items}, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def upsert_thesis(ticker, verdict, rationale, author, date=None):
+    ticker = ticker.strip().upper()
+    author = author.strip()
+    entry = {
+        "ticker": ticker,
+        "verdict": verdict,
+        "rationale": rationale.strip(),
+        "author": author,
+        "date": date or datetime.now().date().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+    }
+    with _thesis_lock:
+        items = _load_theses()
+        items[f"{ticker}::{author}"] = entry
+        _save_theses(items)
+    return entry
+
+
+def latest_theses():
+    """Newest thesis per ticker across authors."""
+    items = _load_theses().values()
+    latest = {}
+    for entry in items:
+        if not isinstance(entry, dict) or not entry.get("ticker"):
+            continue
+        ticker = entry["ticker"].upper()
+        prev = latest.get(ticker)
+        stamp = entry.get("updated_at", entry.get("date", ""))
+        prev_stamp = prev.get("updated_at", prev.get("date", "")) if prev else ""
+        if prev is None or stamp > prev_stamp:
+            latest[ticker] = entry
+    return latest
+
+
+def latest_thesis(ticker):
+    return latest_theses().get(ticker.upper())
 
 # History tickers needed beyond portfolio/watchlist (FX for ATH-date conversion, gold spot)
 AUX_TICKERS = ["EURUSD=X", "GC=F"]
@@ -140,8 +249,8 @@ def cache_set(key, val):
 
 # ── FX ────────────────────────────────────────────────────────────────────────
 
-FX_PAIRS = ["EURUSD=X", "EURGBP=X", "EURJPY=X", "EURCHF=X"]
-FX_FALLBACK = {"EURUSD=X": 1.16, "EURGBP=X": 0.85, "EURJPY=X": 180.0, "EURCHF=X": 0.93}
+FX_FALLBACK_PER_EUR = {"EUR": 1.0, "USD": 1.16, "GBP": 0.85, "JPY": 180.0, "CHF": 0.93}
+COMMON_FX_CURRENCIES = {"EUR", "USD", "GBP", "JPY", "CHF"}
 
 # Yahoo quotes some exchanges in minor units (LSE in pence)
 _MINOR_UNITS = {"GBp": ("GBP", 100.0), "ZAc": ("ZAR", 100.0), "ILA": ("ILS", 100.0)}
@@ -160,19 +269,68 @@ def normalize_ccy(price, currency):
     return price, currency
 
 
-def get_fx_rates():
-    """EUR-based rates (CCY per 1 EUR), one batched download, 5 min cache."""
+def _major_currency(currency):
+    if currency in _MINOR_UNITS:
+        return _MINOR_UNITS[currency][0]
+    return str(currency or get_base_currency()).upper()
+
+
+def _configured_currencies(extra=None):
+    currencies = {get_base_currency(), *COMMON_FX_CURRENCIES}
+    for item in PORTFOLIO + WATCHLIST:
+        currencies.add(_major_currency(item.get("currency")))
+    for currency in extra or []:
+        currencies.add(_major_currency(currency))
+    return {c for c in currencies if c}
+
+
+def _pair_rate_from_eur_fallback(from_ccy, to_ccy):
+    from_per_eur = FX_FALLBACK_PER_EUR.get(from_ccy)
+    to_per_eur = FX_FALLBACK_PER_EUR.get(to_ccy)
+    if from_per_eur and to_per_eur:
+        return to_per_eur / from_per_eur
+    return None
+
+
+def _fx_pairs_for(currencies=None):
+    currencies = _configured_currencies(currencies)
+    pairs = {"EURUSD=X"}
+    base = get_base_currency()
+    for currency in currencies:
+        if currency == base:
+            continue
+        pairs.add(f"{currency}{base}=X")
+        pairs.add(f"{base}{currency}=X")
+    return pairs
+
+
+def _fallback_rates(pairs):
+    rates = {}
+    for pair in pairs:
+        raw = pair[:-2] if pair.endswith("=X") else pair
+        if len(raw) != 6:
+            continue
+        rate = _pair_rate_from_eur_fallback(raw[:3], raw[3:])
+        if rate:
+            rates[pair] = rate
+    return rates
+
+
+def get_fx_rates(currencies=None):
+    """Dynamic FX rates as Yahoo pairs (TO per 1 FROM), cached for 5 minutes."""
     global _fx_cache, _fx_ts
+    pairs = _fx_pairs_for(currencies)
     with _fx_lock:
-        if _fx_cache and time.time() - _fx_ts < _FX_TTL:
+        if _fx_cache and pairs.issubset(_fx_cache.keys()) and time.time() - _fx_ts < _FX_TTL:
             return _fx_cache
-        rates = dict(FX_FALLBACK)
+        rates = _fallback_rates(pairs)
         try:
-            df = yf.download(FX_PAIRS, period="5d", progress=False,
+            df = yf.download(sorted(pairs), period="5d", progress=False,
                              auto_adjust=True, group_by="ticker", threads=True)
-            for pair in FX_PAIRS:
+            for pair in pairs:
                 try:
-                    closes = df[pair]["Close"].dropna()
+                    closes = (df[pair]["Close"] if isinstance(df.columns, pd.MultiIndex)
+                              else df["Close"]).dropna()
                     if len(closes) > 0:
                         rates[pair] = float(closes.iloc[-1])
                 except Exception:
@@ -184,22 +342,69 @@ def get_fx_rates():
 
 
 def get_eurusd_rate():
-    return get_fx_rates()["EURUSD=X"]
+    return get_fx_rates(["USD"])["EURUSD=X"]
+
+
+def fx_rate_on(from_ccy, to_ccy, date_str):
+    """FX close on or before a date (TO per 1 FROM), if stored."""
+    from_ccy, to_ccy = _major_currency(from_ccy), _major_currency(to_ccy)
+    if from_ccy == to_ccy:
+        return 1.0
+    pair = f"{from_ccy}{to_ccy}=X"
+    inverse = f"{to_ccy}{from_ccy}=X"
+    with closing(_conn()) as conn:
+        row = conn.execute(
+            "SELECT close FROM prices WHERE ticker = ? AND date <= ? "
+            "ORDER BY date DESC LIMIT 1", (pair, date_str)).fetchone()
+        if row:
+            return row[0]
+        row = conn.execute(
+            "SELECT close FROM prices WHERE ticker = ? AND date <= ? "
+            "ORDER BY date DESC LIMIT 1", (inverse, date_str)).fetchone()
+        if row and row[0]:
+            return 1 / row[0]
+    return None
+
+
+def _rate_from_map(rates, from_ccy, to_ccy):
+    if from_ccy == to_ccy:
+        return 1.0
+    direct = rates.get(f"{from_ccy}{to_ccy}=X")
+    if direct:
+        return direct
+    inverse = rates.get(f"{to_ccy}{from_ccy}=X")
+    if inverse:
+        return 1 / inverse
+    return None
+
+
+def convert_to_base(price, currency, rates=None, base_currency=None, date_str=None):
+    """Convert a price in any supported currency (incl. GBp) to the configured base."""
+    if price is None:
+        return price
+    price, currency = normalize_ccy(price, currency)
+    currency = _major_currency(currency)
+    base_currency = _major_currency(base_currency or get_base_currency())
+    if currency == base_currency:
+        return price
+    if rates is None:
+        rates = get_fx_rates([currency, base_currency])
+    rate = fx_rate_on(currency, base_currency, date_str) if date_str else None
+    rate = rate or _rate_from_map(rates, currency, base_currency)
+    if rate:
+        return price * rate
+    if currency != "USD" and base_currency != "USD":
+        to_usd = _rate_from_map(rates, currency, "USD")
+        usd_to_base = _rate_from_map(rates, "USD", base_currency)
+        if to_usd and usd_to_base:
+            return price * to_usd * usd_to_base
+    fallback = _pair_rate_from_eur_fallback(currency, base_currency)
+    return price * fallback if fallback else price
 
 
 def convert_to_eur(price, currency, rates=None):
-    """Convert a price in any supported currency (incl. GBp) to EUR."""
-    if price is None or currency in (None, "", "EUR"):
-        return price
-    price, currency = normalize_ccy(price, currency)
-    if currency == "EUR":
-        return price
-    if rates is None:
-        rates = get_fx_rates()
-    rate = rates.get(f"EUR{currency}=X")
-    if rate:
-        return price / rate
-    return price / rates["EURUSD=X"]  # last resort: treat as USD
+    """Backward-compatible explicit EUR conversion."""
+    return convert_to_base(price, currency, rates, base_currency="EUR")
 
 
 # ── SQLite price store ────────────────────────────────────────────────────────
@@ -271,11 +476,7 @@ def ath_row(ticker):
 
 def eurusd_on(date_str):
     """EUR/USD close on or before a date (from stored history)."""
-    with closing(_conn()) as conn:
-        row = conn.execute(
-            "SELECT close FROM prices WHERE ticker = 'EURUSD=X' AND date <= ? "
-            "ORDER BY date DESC LIMIT 1", (date_str,)).fetchone()
-    return row[0] if row else None
+    return fx_rate_on("EUR", "USD", date_str)
 
 
 def _download_and_store(tickers, **kwargs):
@@ -321,7 +522,7 @@ def refresh_history(tickers, force=False):
 
 
 def all_tickers():
-    return [p["ticker"] for p in PORTFOLIO] + [w["ticker"] for w in WATCHLIST] + AUX_TICKERS
+    return [p["ticker"] for p in PORTFOLIO] + [w["ticker"] for w in WATCHLIST] + AUX_TICKERS + sorted(_fx_pairs_for())
 
 
 # ── Rate-limit-safe .info access ─────────────────────────────────────────────
@@ -440,16 +641,20 @@ def get_etf_implied_target(ticker):
     return result
 
 
-def _apply_gold_target(result):
+def _apply_gold_target(result, rates):
     """Analyst-style targets for the gold ETC, scaled from gold spot forecasts."""
     cfg = CONFIG["manual_targets"]["gold"]
     spot = spot_from_store(cfg["spot_ticker"])
     cp = result.get("current_price")
     if not spot or not cp:
         return
-    result["analyst_target_low"] = round(cp * cfg["target_low_usd"] / spot, 2)
-    result["analyst_target_mean"] = round(cp * cfg["target_mean_usd"] / spot, 2)
-    result["analyst_target_high"] = round(cp * cfg["target_high_usd"] / spot, 2)
+    ccy = result.get("ticker_currency")
+    low = cp * cfg["target_low_usd"] / spot
+    mean = cp * cfg["target_mean_usd"] / spot
+    high = cp * cfg["target_high_usd"] / spot
+    result["analyst_target_low"] = round(convert_to_base(low, ccy, rates), 2)
+    result["analyst_target_mean"] = round(convert_to_base(mean, ccy, rates), 2)
+    result["analyst_target_high"] = round(convert_to_base(high, ccy, rates), 2)
     result["analyst_count"] = 5
     result["recommendation"] = "buy" if cfg["target_mean_usd"] / spot > 1.1 else "hold"
     result["etf_implied"] = {
@@ -490,22 +695,17 @@ def _assemble_stock(ticker_str, pos_currency="USD", period="2y"):
             for h in hist
         ]
 
-        # True ATH from full stored history, converted to EUR at the ATH-date FX
+        # True ATH from full stored history, converted to the configured base at the ATH-date FX
         ath_raw, ath_date = ath_row(ticker_str)
         if ath_raw:
-            norm_ath, major_ccy = normalize_ccy(ath_raw, ticker_ccy)
-            if major_ccy == "USD":
-                fx = eurusd_on(ath_date) or rates["EURUSD=X"]
-                ath_eur = round(norm_ath / fx, 2)
-            else:
-                ath_eur = round(convert_to_eur(ath_raw, ticker_ccy, rates), 2)
-            result["ath"] = ath_eur
+            ath_base = round(convert_to_base(ath_raw, ticker_ccy, rates, date_str=ath_date), 2)
+            result["ath"] = ath_base
             result["ath_raw"] = ath_raw
             result["ath_currency"] = ticker_ccy
             result["ath_date"] = ath_date
             if result["current_price"]:
-                current_eur = convert_to_eur(result["current_price"], ticker_ccy, rates)
-                result["ath_distance_pct"] = round((current_eur / ath_eur - 1) * 100, 2)
+                current_base = convert_to_base(result["current_price"], ticker_ccy, rates)
+                result["ath_distance_pct"] = round((current_base / ath_base - 1) * 100, 2)
 
         # Sparkline: since ATH if it lies within the chart window, else last 90 days
         if hist:
@@ -545,14 +745,14 @@ def _assemble_stock(ticker_str, pos_currency="USD", period="2y"):
         if result.get("sma_50") and cp:
             result["price_vs_sma50_pct"] = round((cp / result["sma_50"] - 1) * 100, 1)
 
-        # Analyst targets in EUR (currency-correct incl. pence)
-        def to_eur(val):
-            return round(convert_to_eur(float(val), ticker_ccy, rates), 2) if val is not None else None
+        # Analyst targets in configured base currency (currency-correct incl. pence)
+        def to_base(val):
+            return round(convert_to_base(float(val), ticker_ccy, rates), 2) if val is not None else None
 
-        result["analyst_target_low"] = to_eur(info.get("targetLowPrice"))
-        result["analyst_target_mean"] = to_eur(info.get("targetMeanPrice"))
-        result["analyst_target_high"] = to_eur(info.get("targetHighPrice"))
-        result["analyst_target_median"] = to_eur(info.get("targetMedianPrice"))
+        result["analyst_target_low"] = to_base(info.get("targetLowPrice"))
+        result["analyst_target_mean"] = to_base(info.get("targetMeanPrice"))
+        result["analyst_target_high"] = to_base(info.get("targetHighPrice"))
+        result["analyst_target_median"] = to_base(info.get("targetMedianPrice"))
         result["analyst_count"] = int(info["numberOfAnalystOpinions"]) if info.get("numberOfAnalystOpinions") else None
         result["recommendation"] = info.get("recommendationKey")
         result["kgv"] = info.get("trailingPE") or info.get("forwardPE")
@@ -565,23 +765,26 @@ def _assemble_stock(ticker_str, pos_currency="USD", period="2y"):
         # Fallbacks for instruments without analyst coverage
         if not result["analyst_target_mean"]:
             if ticker_str in CONFIG["manual_targets"]["gold"]["tickers"]:
-                _apply_gold_target(result)
+                _apply_gold_target(result, rates)
             else:
                 etf = get_etf_implied_target(ticker_str)
                 if etf:
                     result["etf_implied"] = etf
                     cp = result["current_price"]
                     if etf.get("implied_upside") is not None and cp:
-                        result["analyst_target_mean"] = round(cp * (1 + etf["implied_upside"] / 100), 2)
+                        raw_target = cp * (1 + etf["implied_upside"] / 100)
+                        result["analyst_target_mean"] = round(convert_to_base(raw_target, ticker_ccy, rates), 2)
                     if etf.get("range_low") and etf.get("range_high") and cp:
                         if ticker_str in CONFIG["manual_targets"]["bitcoin"]["tickers"]:
                             # ranges are absolute BTC targets -> scale by upside instead
-                            result["analyst_target_low"] = round(cp * (1 + etf["min_upside"] / 100), 2)
-                            result["analyst_target_high"] = round(cp * (1 + etf["max_upside"] / 100), 2)
+                            low = cp * (1 + etf["min_upside"] / 100)
+                            high = cp * (1 + etf["max_upside"] / 100)
                         else:
                             factor = cp / 100
-                            result["analyst_target_low"] = round(etf["range_low"] * factor, 2)
-                            result["analyst_target_high"] = round(etf["range_high"] * factor, 2)
+                            low = etf["range_low"] * factor
+                            high = etf["range_high"] * factor
+                        result["analyst_target_low"] = round(convert_to_base(low, ticker_ccy, rates), 2)
+                        result["analyst_target_high"] = round(convert_to_base(high, ticker_ccy, rates), 2)
                     if etf["implied_upside"] > 15:
                         result["recommendation"] = "buy"
                     elif etf["implied_upside"] > 0:

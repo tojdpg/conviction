@@ -9,6 +9,7 @@ import threading
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 import yfinance as yf
 
 import marketdata as md
-from marketdata import PORTFOLIO, WATCHLIST, convert_to_eur, sanitize
+from marketdata import PORTFOLIO, WATCHLIST, convert_to_base, sanitize
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -41,6 +42,31 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 md.init_db()
+
+
+def _base_money_fields(kind, amount):
+    """Return generic base-currency fields plus legacy *_eur aliases for index.html."""
+    base = md.get_base_currency().lower()
+    return {
+        f"{kind}_{base}": amount,
+        f"{kind}_base": amount,
+        f"{kind}_eur": amount,
+    }
+
+
+def _base_response_fields(total=None):
+    base = md.get_base_currency().lower()
+    fields = {"base_currency": md.get_base_currency(), "currency_symbol": md.get_currency_symbol()}
+    if total is not None:
+        fields[f"total_value_{base}"] = total
+        fields["total_value_base"] = total
+        fields["total_value_eur"] = total
+    return fields
+
+
+@app.get("/api/config")
+def get_config():
+    return JSONResponse(md.get_public_config())
 
 
 @app.get("/api/portfolio-lite")
@@ -76,21 +102,21 @@ def get_portfolio_lite():
         data = fetched.get(pos["ticker"], {})
         price = data.get("current_price")
         ccy = data.get("ticker_currency", pos["currency"])
-        price_eur = convert_to_eur(price, ccy, rates) if price else 0
-        value_eur = pos["shares"] * price_eur
-        total_value += value_eur
+        price_base = convert_to_base(price, ccy, rates) if price else 0
+        value_base = pos["shares"] * price_base
+        total_value += value_base
         results.append({**pos, **data,
-                        "price_eur": round(price_eur, 2),
-                        "value_eur": round(value_eur, 2),
+                        **_base_money_fields("price", round(price_base, 2)),
+                        **_base_money_fields("value", round(value_base, 2)),
                         "pct_of_portfolio": 0})
     for r in results:
         if total_value > 0:
-            r["pct_of_portfolio"] = round(r["value_eur"] / total_value * 100, 2)
-    results.sort(key=lambda x: -x["value_eur"])
+            r["pct_of_portfolio"] = round(r["value_base"] / total_value * 100, 2)
+    results.sort(key=lambda x: -x["value_base"])
 
     return JSONResponse(sanitize({
         "portfolio": results,
-        "total_value_eur": round(total_value, 2),
+        **_base_response_fields(round(total_value, 2)),
         "eurusd": round(rates["EURUSD=X"], 4),
         "timestamp": datetime.now().isoformat(),
         "lite": True,
@@ -119,6 +145,7 @@ def get_portfolio():
     """Full portfolio: analyst data, signals, watchlist, period performance."""
     rates = md.get_fx_rates()
     md.refresh_history(md.all_tickers())  # no-op if refreshed <15 min ago
+    theses = md.latest_theses()
 
     fetched = {}
     with ThreadPoolExecutor(max_workers=8) as ex:
@@ -132,17 +159,18 @@ def get_portfolio():
         data = fetched[pos["ticker"]]
         price = data.get("current_price")
         ccy = data.get("ticker_currency", pos["currency"])
-        price_eur = convert_to_eur(price, ccy, rates) if price else 0
-        value_eur = pos["shares"] * price_eur
-        total_value += value_eur
+        price_base = convert_to_base(price, ccy, rates) if price else 0
+        value_base = pos["shares"] * price_base
+        total_value += value_base
         results.append({**pos, **data,
-                        "price_eur": round(price_eur, 2),
-                        "value_eur": round(value_eur, 2),
-                        "pct_of_portfolio": 0})
+                        **_base_money_fields("price", round(price_base, 2)),
+                        **_base_money_fields("value", round(value_base, 2)),
+                        "pct_of_portfolio": 0,
+                        "thesis": theses.get(pos["ticker"])})
     for r in results:
         if total_value > 0:
-            r["pct_of_portfolio"] = round(r["value_eur"] / total_value * 100, 2)
-    results.sort(key=lambda x: -x["value_eur"])
+            r["pct_of_portfolio"] = round(r["value_base"] / total_value * 100, 2)
+    results.sort(key=lambda x: -x["value_base"])
 
     # Period performance from FULL stored history (36M/48M need >2y of data)
     periods = {"1d": 1, "7d": 7, "1m": 30, "3m": 91, "6m": 182,
@@ -160,12 +188,15 @@ def get_portfolio():
             else:
                 close = _find_close_for_days(full_hist, days)
             if close:
-                totals[key] += pos["shares"] * convert_to_eur(close, ccy, rates)
+                totals[key] += pos["shares"] * convert_to_base(close, ccy, rates)
 
     changes = {}
     for key in periods:
         t = totals[key]
-        changes[f"change_{key}_eur"] = round(total_value - t, 2) if t else None
+        change = round(total_value - t, 2) if t else None
+        changes[f"change_{key}_{md.get_base_currency().lower()}"] = change
+        changes[f"change_{key}_base"] = change
+        changes[f"change_{key}_eur"] = change
         changes[f"change_{key}_pct"] = round((total_value / t - 1) * 100, 2) if t else None
 
     fetched_wl = {}
@@ -180,34 +211,35 @@ def get_portfolio():
         data = fetched_wl[w["ticker"]]
         price = data.get("current_price")
         ccy = data.get("ticker_currency", w["currency"])
-        price_eur = convert_to_eur(price, ccy, rates) if price else None
+        price_base = convert_to_base(price, ccy, rates) if price else None
         watchlist_results.append({**w, **data,
-                                  "price_eur": round(price_eur, 2) if price_eur else None})
+                                  **_base_money_fields("price", round(price_base, 2) if price_base else None),
+                                  "thesis": theses.get(w["ticker"])})
 
     return JSONResponse(sanitize({
         "portfolio": results,
         "watchlist": watchlist_results,
-        "total_value_eur": round(total_value, 2),
+        **_base_response_fields(round(total_value, 2)),
         **changes,
         "eurusd": round(rates["EURUSD=X"], 4),
         "timestamp": datetime.now().isoformat(),
     }))
 
 
-def _compact_row(pos, data, rates, with_value=True):
+def _compact_row(pos, data, rates, with_value=True, theses=None):
     """Small, LLM-friendly view of one instrument (no history/sparklines)."""
     price = data.get("current_price")
     ccy = data.get("ticker_currency", pos["currency"])
-    price_eur = convert_to_eur(price, ccy, rates) if price else None
+    price_base = convert_to_base(price, ccy, rates) if price else None
     upside = None
-    if data.get("analyst_target_mean") and price_eur:
-        upside = round((data["analyst_target_mean"] / price_eur - 1) * 100, 1)
+    if data.get("analyst_target_mean") and price_base:
+        upside = round((data["analyst_target_mean"] / price_base - 1) * 100, 1)
     elif data.get("etf_implied"):
         upside = data["etf_implied"].get("implied_upside")
     row = {
         "ticker": pos["ticker"],
         "name": data.get("short_name") or pos["name"],
-        "price_eur": round(price_eur, 2) if price_eur else None,
+        **_base_money_fields("price", round(price_base, 2) if price_base else None),
         "vs_ath_pct": data.get("ath_distance_pct"),
         "ath_date": data.get("ath_date"),
         "kgv": round(data["kgv"], 1) if data.get("kgv") else None,
@@ -216,9 +248,11 @@ def _compact_row(pos, data, rates, with_value=True):
         "vs_sma50_pct": data.get("price_vs_sma50_pct"),
         "sma_signal": data.get("sma_signal"),
         "target_upside_pct": upside,
+        "target_range_base": [data.get("analyst_target_low"), data.get("analyst_target_high")],
         "target_range_eur": [data.get("analyst_target_low"), data.get("analyst_target_high")],
         "recommendation": data.get("recommendation"),
         "analyst_count": data.get("analyst_count"),
+        "thesis": (theses or {}).get(pos["ticker"]),
     }
     if with_value:
         row["shares"] = pos["shares"]
@@ -228,13 +262,14 @@ def _compact_row(pos, data, rates, with_value=True):
 def _summary_markdown(s):
     def fmt(v, suffix=""):
         return f"{v}{suffix}" if v is not None else "—"
+    symbol = s.get("currency_symbol", md.get_currency_symbol())
     lines = [f"# Depot Summary ({s['timestamp'][:16]})",
-             f"Gesamtwert: **{s['total_value_eur']:,.0f} €** | EUR/USD {s['eurusd']}", ""]
+             f"Gesamtwert: **{s['total_value_base']:,.0f} {symbol}** | EUR/USD {s['eurusd']}", ""]
     perf = " | ".join(f"{k.replace('change_', '').replace('_pct', '')}: {v:+.1f}%"
                       for k, v in s.items()
                       if k.startswith("change_") and k.endswith("_pct") and v is not None)
     lines += [f"Performance: {perf}", "", "## Positionen",
-              "| Ticker | Name | Stück | Kurs € | Wert € | % | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
+              f"| Ticker | Name | Stück | Kurs {symbol} | Wert {symbol} | % | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
               "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in s["portfolio"]:
         lines.append("| " + " | ".join([
@@ -244,7 +279,7 @@ def _summary_markdown(s):
             fmt(r["vs_sma50_pct"], "%"), fmt(r["sma_signal"]),
             fmt(r["target_upside_pct"], "%")]) + " |")
     lines += ["", "## Watchlist",
-              "| Ticker | Name | Kurs € | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
+              f"| Ticker | Name | Kurs {symbol} | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
               "|---|---|---|---|---|---|---|---|---|---|"]
     for r in s["watchlist"]:
         lines.append("| " + " | ".join([
@@ -260,6 +295,7 @@ def get_summary(format: str = "json"):
     format=md returns a markdown report (good for LLM context windows)."""
     rates = md.get_fx_rates()
     md.refresh_history(md.all_tickers())
+    theses = md.latest_theses()
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         pf = {p["ticker"]: f for p, f in
@@ -271,14 +307,14 @@ def get_summary(format: str = "json"):
 
     rows, total = [], 0.0
     for pos in PORTFOLIO:
-        row = _compact_row(pos, pf[pos["ticker"]], rates)
-        value = (row["price_eur"] or 0) * pos["shares"]
-        row["value_eur"] = round(value, 0)
+        row = _compact_row(pos, pf[pos["ticker"]], rates, theses=theses)
+        value = (row["price_base"] or 0) * pos["shares"]
+        row.update(_base_money_fields("value", round(value, 0)))
         total += value
         rows.append(row)
     for r in rows:
-        r["pct_of_portfolio"] = round(r["value_eur"] / total * 100, 1) if total else None
-    rows.sort(key=lambda x: -(x["value_eur"] or 0))
+        r["pct_of_portfolio"] = round(r["value_base"] / total * 100, 1) if total else None
+    rows.sort(key=lambda x: -(x["value_base"] or 0))
 
     periods = {"1d": 1, "7d": 7, "1m": 30, "3m": 91, "6m": 182,
                "12m": 365, "24m": 730, "36m": 1095, "48m": 1460}
@@ -293,16 +329,16 @@ def get_summary(format: str = "json"):
             close = (hist[-2]["close"] if key == "1d" and len(hist) >= 2
                      else _find_close_for_days(hist, days))
             if close:
-                t += pos["shares"] * convert_to_eur(close, ccy, rates)
+                t += pos["shares"] * convert_to_base(close, ccy, rates)
         changes[f"change_{key}_pct"] = round((total / t - 1) * 100, 2) if t else None
 
     summary = sanitize({
         "timestamp": datetime.now().isoformat(),
-        "total_value_eur": round(total, 0),
+        **_base_response_fields(round(total, 0)),
         "eurusd": round(rates["EURUSD=X"], 4),
         **changes,
         "portfolio": rows,
-        "watchlist": [_compact_row(w, wl[w["ticker"]], rates, with_value=False)
+        "watchlist": [_compact_row(w, wl[w["ticker"]], rates, with_value=False, theses=theses)
                       for w in WATCHLIST],
     })
     if format == "md":
@@ -315,6 +351,29 @@ class NewPosition(BaseModel):
     ticker: str
     shares: float | None = None  # None/0 -> watchlist, >0 -> portfolio
     name: str | None = None
+
+
+class ThesisIn(BaseModel):
+    ticker: str
+    verdict: Literal["buy-watch", "wait", "too-hot", "conditional", "sell-watch"]
+    rationale: str
+    author: str
+    date: str | None = None
+
+
+@app.post("/api/thesis")
+def post_thesis(body: ThesisIn):
+    ticker = body.ticker.strip().upper()
+    rationale = body.rationale.strip()
+    author = body.author.strip()
+    if not ticker:
+        raise HTTPException(400, "Ticker fehlt")
+    if not rationale:
+        raise HTTPException(400, "Rationale fehlt")
+    if not author:
+        raise HTTPException(400, "Author fehlt")
+    entry = md.upsert_thesis(ticker, body.verdict, rationale, author, body.date)
+    return {"ok": True, "thesis": entry}
 
 
 @app.post("/api/positions")
@@ -404,8 +463,8 @@ def get_analyst_detail(ticker: str):
         except Exception:
             pass
 
-        def to_eur(val):
-            return round(convert_to_eur(float(val), ccy, rates), 2) if val is not None else None
+        def to_base(val):
+            return round(convert_to_base(float(val), ccy, rates), 2) if val is not None else None
 
         return JSONResponse(sanitize({
             "ticker": ticker,
@@ -417,14 +476,16 @@ def get_analyst_detail(ticker: str):
             "forward_pe": info.get("forwardPE"),
             "dividend_yield": info.get("dividendYield"),
             "beta": info.get("beta"),
-            "52w_high": to_eur(info.get("fiftyTwoWeekHigh")),
-            "52w_low": to_eur(info.get("fiftyTwoWeekLow")),
-            "50d_avg": to_eur(info.get("fiftyDayAverage")),
-            "200d_avg": to_eur(info.get("twoHundredDayAverage")),
-            "analyst_target_low": to_eur(info.get("targetLowPrice")),
-            "analyst_target_mean": to_eur(info.get("targetMeanPrice")),
-            "analyst_target_high": to_eur(info.get("targetHighPrice")),
-            "analyst_target_median": to_eur(info.get("targetMedianPrice")),
+            "base_currency": md.get_base_currency(),
+            "currency_symbol": md.get_currency_symbol(),
+            "52w_high": to_base(info.get("fiftyTwoWeekHigh")),
+            "52w_low": to_base(info.get("fiftyTwoWeekLow")),
+            "50d_avg": to_base(info.get("fiftyDayAverage")),
+            "200d_avg": to_base(info.get("twoHundredDayAverage")),
+            "analyst_target_low": to_base(info.get("targetLowPrice")),
+            "analyst_target_mean": to_base(info.get("targetMeanPrice")),
+            "analyst_target_high": to_base(info.get("targetHighPrice")),
+            "analyst_target_median": to_base(info.get("targetMedianPrice")),
             "analyst_count": info.get("numberOfAnalystOpinions"),
             "recommendation_key": info.get("recommendationKey"),
             "recommendation_mean": info.get("recommendationMean"),
