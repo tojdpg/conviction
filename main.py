@@ -194,6 +194,123 @@ def get_portfolio():
     }))
 
 
+def _compact_row(pos, data, rates, with_value=True):
+    """Small, LLM-friendly view of one instrument (no history/sparklines)."""
+    price = data.get("current_price")
+    ccy = data.get("ticker_currency", pos["currency"])
+    price_eur = convert_to_eur(price, ccy, rates) if price else None
+    upside = None
+    if data.get("analyst_target_mean") and price_eur:
+        upside = round((data["analyst_target_mean"] / price_eur - 1) * 100, 1)
+    elif data.get("etf_implied"):
+        upside = data["etf_implied"].get("implied_upside")
+    row = {
+        "ticker": pos["ticker"],
+        "name": data.get("short_name") or pos["name"],
+        "price_eur": round(price_eur, 2) if price_eur else None,
+        "vs_ath_pct": data.get("ath_distance_pct"),
+        "ath_date": data.get("ath_date"),
+        "kgv": round(data["kgv"], 1) if data.get("kgv") else None,
+        "kbv": round(data["kvb"], 2) if data.get("kvb") else None,
+        "rsi": data.get("rsi"),
+        "vs_sma50_pct": data.get("price_vs_sma50_pct"),
+        "sma_signal": data.get("sma_signal"),
+        "target_upside_pct": upside,
+        "target_range_eur": [data.get("analyst_target_low"), data.get("analyst_target_high")],
+        "recommendation": data.get("recommendation"),
+        "analyst_count": data.get("analyst_count"),
+    }
+    if with_value:
+        row["shares"] = pos["shares"]
+    return row
+
+
+def _summary_markdown(s):
+    def fmt(v, suffix=""):
+        return f"{v}{suffix}" if v is not None else "—"
+    lines = [f"# Depot Summary ({s['timestamp'][:16]})",
+             f"Gesamtwert: **{s['total_value_eur']:,.0f} €** | EUR/USD {s['eurusd']}", ""]
+    perf = " | ".join(f"{k.replace('change_', '').replace('_pct', '')}: {v:+.1f}%"
+                      for k, v in s.items()
+                      if k.startswith("change_") and k.endswith("_pct") and v is not None)
+    lines += [f"Performance: {perf}", "", "## Positionen",
+              "| Ticker | Name | Stück | Kurs € | Wert € | % | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in s["portfolio"]:
+        lines.append("| " + " | ".join([
+            r["ticker"], r["name"][:22], fmt(r.get("shares")), fmt(r["price_eur"]),
+            fmt(r.get("value_eur")), fmt(r.get("pct_of_portfolio"), "%"),
+            fmt(r["vs_ath_pct"], "%"), fmt(r["kgv"]), fmt(r["kbv"]), fmt(r["rsi"]),
+            fmt(r["vs_sma50_pct"], "%"), fmt(r["sma_signal"]),
+            fmt(r["target_upside_pct"], "%")]) + " |")
+    lines += ["", "## Watchlist",
+              "| Ticker | Name | Kurs € | vs.ATH | KGV | KBV | RSI | vs.SMA50 | Signal | Ziel-Upside |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    for r in s["watchlist"]:
+        lines.append("| " + " | ".join([
+            r["ticker"], r["name"][:22], fmt(r["price_eur"]), fmt(r["vs_ath_pct"], "%"),
+            fmt(r["kgv"]), fmt(r["kbv"]), fmt(r["rsi"]), fmt(r["vs_sma50_pct"], "%"),
+            fmt(r["sma_signal"]), fmt(r["target_upside_pct"], "%")]) + " |")
+    return "\n".join(lines) + "\n"
+
+
+@app.get("/api/summary")
+def get_summary(format: str = "json"):
+    """Agent-friendly compact summary: all signals, no history/sparkline arrays.
+    format=md returns a markdown report (good for LLM context windows)."""
+    rates = md.get_fx_rates()
+    md.refresh_history(md.all_tickers())
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        pf = {p["ticker"]: f for p, f in
+              [(p, ex.submit(md.get_stock_data, p["ticker"], p["currency"], "2y")) for p in PORTFOLIO]}
+        wl = {w["ticker"]: f for w, f in
+              [(w, ex.submit(md.get_stock_data, w["ticker"], w["currency"], "1y")) for w in WATCHLIST]}
+        pf = {t: f.result() for t, f in pf.items()}
+        wl = {t: f.result() for t, f in wl.items()}
+
+    rows, total = [], 0.0
+    for pos in PORTFOLIO:
+        row = _compact_row(pos, pf[pos["ticker"]], rates)
+        value = (row["price_eur"] or 0) * pos["shares"]
+        row["value_eur"] = round(value, 0)
+        total += value
+        rows.append(row)
+    for r in rows:
+        r["pct_of_portfolio"] = round(r["value_eur"] / total * 100, 1) if total else None
+    rows.sort(key=lambda x: -(x["value_eur"] or 0))
+
+    periods = {"1d": 1, "7d": 7, "1m": 30, "3m": 91, "6m": 182,
+               "12m": 365, "24m": 730, "36m": 1095, "48m": 1460}
+    changes = {}
+    for key, days in periods.items():
+        t = 0.0
+        for pos in PORTFOLIO:
+            hist = md.history_rows(pos["ticker"])
+            if not hist:
+                continue
+            ccy = pf[pos["ticker"]].get("ticker_currency", pos["currency"])
+            close = (hist[-2]["close"] if key == "1d" and len(hist) >= 2
+                     else _find_close_for_days(hist, days))
+            if close:
+                t += pos["shares"] * convert_to_eur(close, ccy, rates)
+        changes[f"change_{key}_pct"] = round((total / t - 1) * 100, 2) if t else None
+
+    summary = sanitize({
+        "timestamp": datetime.now().isoformat(),
+        "total_value_eur": round(total, 0),
+        "eurusd": round(rates["EURUSD=X"], 4),
+        **changes,
+        "portfolio": rows,
+        "watchlist": [_compact_row(w, wl[w["ticker"]], rates, with_value=False)
+                      for w in WATCHLIST],
+    })
+    if format == "md":
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(_summary_markdown(summary), media_type="text/markdown")
+    return JSONResponse(summary)
+
+
 class NewPosition(BaseModel):
     ticker: str
     shares: float | None = None  # None/0 -> watchlist, >0 -> portfolio

@@ -83,6 +83,7 @@ Environment variables: `PORT` (default 8080), `HOST` (default 0.0.0.0),
 |---|---|
 | `GET /api/portfolio-lite` | Prices + FX only (fast) |
 | `GET /api/portfolio` | Everything: signals, analysts, watchlist, performance |
+| `GET /api/summary?format=md` | Compact agent/LLM-friendly report (markdown or JSON, ~4 KB, no history arrays) |
 | `GET /api/history/{ticker}?period=5y` | Price history from the local store |
 | `GET /api/analysts/{ticker}` | Analyst detail for one instrument |
 | `POST /api/positions` | Add position `{ticker, shares?, name?}` (no shares → watchlist) |
