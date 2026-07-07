@@ -9,3 +9,4 @@ __pycache__/
 *.log
 data/
 HANDOVER.md
+RELEASE_PLAN.md
