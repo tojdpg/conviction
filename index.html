@@ -204,8 +204,8 @@
             <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('spread')" data-i18n>Streuung</th>
             <th class="px-4 py-3 text-center" title="Agent-These via POST /api/thesis" data-i18n>These</th>
             <th class="px-4 py-3 text-center sparkline-cell" data-i18n>Verlauf</th>
-            <th class="px-4 py-3 text-center sparkline-cell">12M</th>
-            <th class="px-2 py-3 text-center sparkline-cell">5J</th>
+            <th class="px-4 py-3 text-center sparkline-cell" data-i18n>12M</th>
+            <th class="px-2 py-3 text-center sparkline-cell" data-i18n>5J</th>
           </tr>
         </thead>
         <tbody id="portfolio-table"></tbody>
@@ -231,8 +231,8 @@
               <th class="px-2 py-3 text-right hide-mobile" data-i18n>Streuung</th>
               <th class="px-2 py-3 text-center" data-i18n>These</th>
               <th class="px-2 py-3 text-center sparkline-cell" data-i18n>Verlauf</th>
-              <th class="px-2 py-3 text-center sparkline-cell">12M</th>
-              <th class="px-2 py-3 text-center sparkline-cell">5J</th>
+              <th class="px-2 py-3 text-center sparkline-cell" data-i18n>12M</th>
+              <th class="px-2 py-3 text-center sparkline-cell" data-i18n>5J</th>
             </tr>
           </thead>
           <tbody id="watchlist-table"></tbody>
@@ -345,7 +345,7 @@ const L_EN = {
   '📊 Zusammenfassung': '📊 Summary',
   '📈 Detail mit SMA 50/200': '📈 Detail with SMA 50/200',
   '⬜ SMA 200': '⬜ SMA 200', '🟨 SMA 50': '🟨 SMA 50', '⬜ Kurs': '⬜ Price',
-  '1J': '1Y', '5J-Btn': '5Y', 'Min': 'Min', 'Max': 'Max',
+  '1J': '1Y', '5J': '5Y', 'Min': 'Min', 'Max': 'Max',
   'Weltweite Aktien-ETFs': 'Global equity ETFs', 'Big Tech Einzeltitel': 'Big tech single stocks',
   'Bitcoin/Krypto': 'Bitcoin/crypto', 'Anleihen/Defensiv': 'Bonds/defensive', 'EM/Schwellenländer': 'Emerging markets', 'Sonstiges': 'Other',
 };
@@ -462,7 +462,7 @@ async function loadPortfolio() {
       if (eur == null || pct == null) { el.textContent = '—'; return; }
       const sign = eur >= 0 ? '+' : '';
       const kVal = Math.round(eur / 1000);
-      el.textContent = `${sign}${kVal.toLocaleString('de-DE')}k`;
+      el.textContent = `${sign}${kVal.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE')}k`;
       el.className = 'font-semibold ' + (eur >= 0 ? 'text-green-400' : 'text-red-400');
       const tipEl = el.parentElement.querySelector('.tip');
       if (tipEl) tipEl.textContent = `${sign}${formatEUR(eur, 2)} (${sign}${pct.toFixed(2)}%)`;
@@ -573,7 +573,7 @@ function formatPct(n) {
 
 function formatK(n) {
   if (n == null) return '—';
-  return Math.round(n / 1000).toLocaleString('de-DE');
+  return Math.round(n / 1000).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE');
 }
 
 function getRecommendation(rec, current, targetMean) {
@@ -732,9 +732,9 @@ function renderTable() {
       <td class="px-2 py-3" style="max-width:120px;overflow:hidden;position:relative">
         <span class="del-btn" title="${LANG === 'en' ? 'Remove from portfolio' : 'Aus dem Depot entfernen'}" onclick="deletePosition('portfolio','${p.ticker}')">✕</span>
         <div class="font-semibold truncate">${p.short_name || p.name}</div>
-        <div class="text-gray-500 text-xs">${p.shares.toLocaleString('de-DE', {maximumFractionDigits: p.shares < 10 ? 4 : 0})}x · ${p.ticker} ${isETF ? '📊' : p.ticker.startsWith('BTC') ? '₿' : '📈'}</div>
+        <div class="text-gray-500 text-xs">${p.shares.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE', {maximumFractionDigits: p.shares < 10 ? 4 : 0})}x · ${p.ticker} ${isETF ? '📊' : p.ticker.startsWith('BTC') ? '₿' : '📈'}</div>
       </td>
-      <td class="px-4 py-3 text-right">${p.price_eur ? Math.round(p.price_eur).toLocaleString('de-DE') : '—'}</td>
+      <td class="px-4 py-3 text-right">${p.price_eur ? Math.round(p.price_eur).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') : '—'}</td>
       <td class="px-4 py-3 text-right font-semibold">${formatK(p.value_eur)}</td>
       <td class="px-4 py-3 text-right">
         <span class="text-xs">${Math.round(p.pct_of_portfolio)}%</span>
@@ -839,7 +839,7 @@ function renderWatchlist() {
         <div class="font-semibold truncate" style="max-width:120px">${p.short_name || p.name}</div>
         <div class="text-gray-500 text-xs">${p.ticker} ${isETF ? '📊' : '📈'}</div>
       </td>
-      <td class="px-2 py-3 text-right font-semibold">${p.price_eur ? Math.round(p.price_eur).toLocaleString('de-DE') : '—'}</td>
+      <td class="px-2 py-3 text-right font-semibold">${p.price_eur ? Math.round(p.price_eur).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') : '—'}</td>
       <td class="px-2 py-3 text-right ${athClass}">
         <div class="tooltip">
           ${formatPct(p.ath_distance_pct)}
