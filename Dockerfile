@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.title="Portfolio Tracker" \
+LABEL org.opencontainers.image.title="conviction" \
       org.opencontainers.image.description="Self-hosted portfolio decision cockpit" \
-      org.opencontainers.image.source="https://github.com/tojdpg/portfoliotracker"
+      org.opencontainers.image.source="https://github.com/tojdpg/conviction"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

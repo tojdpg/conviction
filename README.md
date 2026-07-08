@@ -66,7 +66,7 @@ judgment = solidified decisions. The tracker is the cockpit, not the pilot.
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/tojdpg/portfoliotracker.git
+git clone https://github.com/tojdpg/conviction.git
 cd portfoliotracker
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
