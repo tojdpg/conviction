@@ -10,3 +10,4 @@ __pycache__/
 data/
 HANDOVER.md
 RELEASE_PLAN.md
+.worktrees/
