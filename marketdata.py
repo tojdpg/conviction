@@ -115,6 +115,20 @@ def add_position(list_name, entry):
     return True
 
 
+def set_buy_price(ticker, buy_price):
+    """Set or clear the avg cost per share (base currency) on a portfolio position."""
+    with _config_lock:
+        for pos in CONFIG["portfolio"]:
+            if pos["ticker"] == ticker:
+                if buy_price and buy_price > 0:
+                    pos["buy_price"] = buy_price
+                else:
+                    pos.pop("buy_price", None)
+                _save_config()
+                return True
+    return False
+
+
 def remove_position(list_name, ticker):
     with _config_lock:
         lst = CONFIG[list_name]

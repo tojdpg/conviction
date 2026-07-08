@@ -340,6 +340,9 @@ const L_EN = {
   'Fehler beim Entfernen': 'Failed to remove',
   'KAUFEN': 'BUY', 'VERKAUFEN': 'SELL', 'HALTEN': 'HOLD',
   'G&V': 'P/L', 'Einstand € (optional)': 'Cost basis (optional)', 'Einstand': 'Cost basis',
+  'Einstand eintragen': 'Set cost basis', 'Klicken zum Ändern': 'Click to edit',
+  'Einstand je Aktie in € (leer = löschen)': 'Cost basis per share (empty = clear)',
+  'Ungültiger Wert': 'Invalid value',
   'nur mit Stück · Durchschnittskurs je Aktie in €': 'portfolio only · avg price per share',
   'Kauf-Watch': 'Buy watch', 'Warten': 'Wait', 'Zu heiß': 'Too hot', 'Bedingt': 'Conditional', 'Verkauf-Watch': 'Sell watch',
   'Agent': 'Agent', 'These älter als 30 Tage': 'thesis older than 30 days',
@@ -405,13 +408,30 @@ const VERDICT_LABEL = { 'buy-watch': 'Kauf-Watch', 'wait': 'Warten', 'too-hot': 
 const VERDICT_CLS = { 'buy-watch': 'text-green-400', 'wait': 'text-yellow-400', 'too-hot': 'text-red-400', 'conditional': 'text-orange-300', 'sell-watch': 'text-red-300' };
 function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function gainCell(p) {
-  if (!p.buy_price || !p.price_eur) return '<span class="text-gray-500">—</span>';
+  const edit = `onclick="editBuyPrice('${p.ticker}', ${p.buy_price || 'null'})" style="cursor:pointer"`;
+  if (!p.buy_price || !p.price_eur)
+    return `<span class="text-gray-500" ${edit} title="${t('Einstand eintragen')}">—</span>`;
   const pct = (p.price_eur / p.buy_price - 1) * 100;
   p.gain_pct = pct;
   const abs = (p.price_eur - p.buy_price) * (p.shares || 0);
   const cls = pct >= 0 ? 'gain' : 'loss';
   const sign = pct >= 0 ? '+' : '';
-  return `<div class="tooltip"><span class="${cls}">${sign}${pct.toFixed(0)}%</span><span class="tip">${t('Einstand')}: ${formatEUR(p.buy_price, 2)}<br>${sign}${formatEUR(abs)}</span></div>`;
+  return `<div class="tooltip" ${edit}><span class="${cls}">${sign}${pct.toFixed(0)}%</span><span class="tip">${t('Einstand')}: ${formatEUR(p.buy_price, 2)}<br>${sign}${formatEUR(abs)}<br><span class="text-gray-400">${t('Klicken zum Ändern')}</span></span></div>`;
+}
+
+async function editBuyPrice(ticker, current) {
+  const msg = t('Einstand je Aktie in € (leer = löschen)');
+  const raw = prompt(`${ticker} — ${msg}`, current || '');
+  if (raw === null) return;
+  const val = raw.trim() === '' ? null : parseFloat(raw.replace(',', '.'));
+  if (raw.trim() !== '' && (!isFinite(val) || val < 0)) { alert(t('Ungültiger Wert')); return; }
+  const resp = await fetch(`/api/positions/portfolio/${encodeURIComponent(ticker)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ buy_price: val })
+  });
+  if (resp.ok) loadPortfolio();
+  else alert('Fehler: ' + ((await resp.json()).detail || resp.status));
 }
 
 function thesisCell(p) {

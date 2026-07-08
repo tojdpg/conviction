@@ -418,6 +418,17 @@ def add_position(body: NewPosition):
             "name": name, "currency": currency}
 
 
+class BuyPriceIn(BaseModel):
+    buy_price: float | None = None  # None or 0 clears the cost basis
+
+
+@app.patch("/api/positions/portfolio/{ticker}")
+def set_buy_price(ticker: str, body: BuyPriceIn):
+    if not md.set_buy_price(ticker, body.buy_price):
+        raise HTTPException(404, f"'{ticker}' nicht im Depot")
+    return {"ok": True, "ticker": ticker, "buy_price": body.buy_price}
+
+
 @app.delete("/api/positions/{list_name}/{ticker}")
 def delete_position(list_name: str, ticker: str):
     if list_name not in ("portfolio", "watchlist"):
