@@ -1,0 +1,205 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - wp/ci
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-smoke:
+    name: Ruff + smoke (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt ruff "httpx<1"
+
+      - name: Ruff lint
+        run: python -m ruff check --ignore E741,E731 main.py marketdata.py
+
+      - name: Smoke test with mocked yfinance
+        env:
+          PORTFOLIO_DATA_DIR: ${{ runner.temp }}/portfolio-smoke-data
+        run: |
+          python - <<'PY'
+          import os
+          import tempfile
+
+          import pandas as pd
+          import yfinance as yf
+
+          os.environ.setdefault("PORTFOLIO_DATA_DIR", tempfile.mkdtemp(prefix="portfolio-smoke-"))
+
+          def history_df(periods=260):
+              idx = pd.date_range(end=pd.Timestamp.today().normalize(), periods=periods, freq="B")
+              close = pd.Series([100 + i * 0.1 for i in range(periods)], index=idx)
+              return pd.DataFrame({"Close": close, "High": close + 1, "Low": close - 1}, index=idx)
+
+          class FundsData:
+              @property
+              def top_holdings(self):
+                  return pd.DataFrame(
+                      {"Holding Percent": [0.10, 0.08, 0.06]},
+                      index=["AAPL", "MSFT", "NVDA"],
+                  )
+
+          class MockTicker:
+              def __init__(self, ticker):
+                  self.ticker = ticker
+                  self.funds_data = FundsData()
+
+              @property
+              def info(self):
+                  price = 150.0
+                  currency = "EUR" if self.ticker.endswith((".DE", ".AS")) else "USD"
+                  return {
+                      "currentPrice": price,
+                      "regularMarketPrice": price,
+                      "previousClose": price - 1,
+                      "currency": currency,
+                      "shortName": f"Mock {self.ticker}",
+                      "recommendationKey": "buy",
+                      "trailingPE": 18.0,
+                      "priceToBook": 2.1,
+                      "targetLowPrice": price * 0.9,
+                      "targetMeanPrice": price * 1.2,
+                      "targetHighPrice": price * 1.4,
+                      "targetMedianPrice": price * 1.1,
+                      "numberOfAnalystOpinions": 12,
+                      "recommendationMean": 2.0,
+                      "sector": "Technology",
+                      "industry": "Software",
+                      "marketCap": 1_000_000_000,
+                      "fiftyTwoWeekHigh": price * 1.1,
+                      "fiftyTwoWeekLow": price * 0.7,
+                      "fiftyDayAverage": price * 0.98,
+                      "twoHundredDayAverage": price * 0.95,
+                  }
+
+              def history(self, period="2y"):
+                  return history_df()
+
+              @property
+              def recommendations(self):
+                  idx = pd.date_range(end=pd.Timestamp.today().normalize(), periods=2, freq="D")
+                  return pd.DataFrame(
+                      {
+                          "Firm": ["MockBank", "MockBank"],
+                          "To Grade": ["Buy", "Buy"],
+                          "From Grade": ["Hold", "Buy"],
+                          "Action": ["up", "main"],
+                      },
+                      index=idx,
+                  )
+
+          def download(tickers, *args, **kwargs):
+              if isinstance(tickers, str):
+                  ticker_list = [tickers]
+              else:
+                  ticker_list = list(tickers)
+              base = history_df()
+              if len(ticker_list) == 1:
+                  return base
+              return pd.concat({ticker: base for ticker in ticker_list}, axis=1)
+
+          yf.Ticker = MockTicker
+          yf.download = download
+
+          from fastapi.testclient import TestClient
+          import main
+
+          with TestClient(main.app) as client:
+              root = client.get("/")
+              assert root.status_code == 200, root.text
+
+              cfg = client.get("/api/config")
+              assert cfg.status_code == 200, cfg.text
+              assert cfg.json()["base_currency"] == "EUR", cfg.text
+
+              lite = client.get("/api/portfolio-lite")
+              assert lite.status_code == 200, lite.text
+              assert lite.json()["portfolio"], lite.text
+
+              summary = client.get("/api/summary")
+              assert summary.status_code == 200, summary.text
+              assert summary.json()["watchlist"], summary.text
+
+          print("smoke ok")
+          PY
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    needs: lint-smoke
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+          labels: |
+            org.opencontainers.image.title=Portfolio Tracker
+            org.opencontainers.image.description=Self-hosted portfolio decision cockpit
+
+      - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image and publish tagged releases
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
