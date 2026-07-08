@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Optional `buy_price` (cost basis) per position: P/L column with gain tooltip, input in the add-position form
+
 ### Renamed
 - Project renamed from "Flatex Depot Tracker" to **conviction** in all
   documentation. In-app title updated separately. The repo name will follow.

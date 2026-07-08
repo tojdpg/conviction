@@ -124,7 +124,8 @@ your LAN, or via [Tailscale](https://tailscale.com)/WireGuard from your phone.
 {
   "portfolio": [
     // shares = how many you own; currency = trading currency of the ticker
-    {"name": "Apple", "ticker": "AAPL", "shares": 10, "currency": "USD"}
+    // buy_price (optional) = avg cost per share in your base currency -> enables the P/L column
+    {"name": "Apple", "ticker": "AAPL", "shares": 10, "currency": "USD", "buy_price": 145.20}
   ],
   "watchlist": [
     // same shape, but without shares

@@ -256,6 +256,10 @@ def _compact_row(pos, data, rates, with_value=True, theses=None):
     }
     if with_value:
         row["shares"] = pos["shares"]
+        buy = pos.get("buy_price")
+        if buy and price_base:
+            row["buy_price"] = buy
+            row["gain_pct"] = round((price_base / buy - 1) * 100, 1)
     return row
 
 
@@ -351,6 +355,7 @@ class NewPosition(BaseModel):
     ticker: str
     shares: float | None = None  # None/0 -> watchlist, >0 -> portfolio
     name: str | None = None
+    buy_price: float | None = None  # avg cost per share in base currency (portfolio only)
 
 
 class ThesisIn(BaseModel):
@@ -392,6 +397,8 @@ def add_position(body: NewPosition):
     if body.shares and body.shares > 0:
         list_name = "portfolio"
         entry = {"name": name, "ticker": ticker, "shares": body.shares, "currency": currency}
+        if body.buy_price and body.buy_price > 0:
+            entry["buy_price"] = body.buy_price
     else:
         list_name = "watchlist"
         entry = {"name": name, "ticker": ticker, "currency": currency}
