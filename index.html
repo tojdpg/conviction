@@ -179,6 +179,10 @@
           <input id="add-shares" type="number" step="any" min="0" class="bg-gray-700 rounded px-2 py-1 text-sm w-36" placeholder="z.B. 50">
         </div>
         <div>
+          <label class="text-xs text-gray-400 block mb-1" data-i18n>Einstand € (optional)</label>
+          <input id="add-buyprice" type="number" step="any" min="0" class="bg-gray-700 rounded px-2 py-1 text-sm w-32" placeholder="z.B. 42.50" title="nur mit Stück sinnvoll">
+        </div>
+        <div>
           <label class="text-xs text-gray-400 block mb-1" data-i18n>Name (optional, sonst von Yahoo)</label>
           <input id="add-name" class="bg-gray-700 rounded px-2 py-1 text-sm w-44" placeholder="Anzeigename">
         </div>
@@ -194,6 +198,7 @@
             <th class="px-4 py-3 text-right" onclick="sortTable('price_eur')" title="Aktueller Marktkurs (Yahoo Finance, max. 15 Min. alt). NICHT der Kaufkurs." data-i18n>Kurs €</th>
             <th class="px-4 py-3 text-right" onclick="sortTable('value_eur')" title="Automatisch berechnet: Stück × aktueller Kurs, in Tausend" data-i18n>Wert k€</th>
             <th class="px-4 py-3 text-right" onclick="sortTable('pct_of_portfolio')" title="Automatisch berechnet: Anteil am Gesamtdepot" data-i18n>Anteil</th>
+            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('gain_pct')" title="Gewinn/Verlust vs. Einstand (buy_price in config.json)" data-i18n>G&V</th>
             <th class="px-4 py-3 text-right" onclick="sortTable('ath_distance_pct')" data-i18n>vs. ATH</th>
             <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kgv')" data-i18n>KGV</th>
             <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kvb')" data-i18n>KBV</th>
@@ -333,6 +338,8 @@ const L_EN = {
   'wirklich': 'really', 'aus dem Depot entfernen': 'remove from portfolio', 'von der Watchlist entfernen': 'remove from watchlist',
   'Fehler beim Entfernen': 'Failed to remove',
   'KAUFEN': 'BUY', 'VERKAUFEN': 'SELL', 'HALTEN': 'HOLD',
+  'G&V': 'P/L', 'Einstand € (optional)': 'Cost basis (optional)', 'Einstand': 'Cost basis',
+  'nur mit Stück · Durchschnittskurs je Aktie in €': 'portfolio only · avg price per share',
   'Kauf-Watch': 'Buy watch', 'Warten': 'Wait', 'Zu heiß': 'Too hot', 'Bedingt': 'Conditional', 'Verkauf-Watch': 'Sell watch',
   'Agent': 'Agent', 'These älter als 30 Tage': 'thesis older than 30 days',
   'Analysten-Zielkorridor': 'Analyst target corridor', 'Aktuell': 'Current', 'Mittel': 'Mean',
@@ -396,6 +403,16 @@ const RULE_TXT = {
 const VERDICT_LABEL = { 'buy-watch': 'Kauf-Watch', 'wait': 'Warten', 'too-hot': 'Zu heiß', 'conditional': 'Bedingt', 'sell-watch': 'Verkauf-Watch' };
 const VERDICT_CLS = { 'buy-watch': 'text-green-400', 'wait': 'text-yellow-400', 'too-hot': 'text-red-400', 'conditional': 'text-orange-300', 'sell-watch': 'text-red-300' };
 function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function gainCell(p) {
+  if (!p.buy_price || !p.price_eur) return '<span class="text-gray-500">—</span>';
+  const pct = (p.price_eur / p.buy_price - 1) * 100;
+  p.gain_pct = pct;
+  const abs = (p.price_eur - p.buy_price) * (p.shares || 0);
+  const cls = pct >= 0 ? 'gain' : 'loss';
+  const sign = pct >= 0 ? '+' : '';
+  return `<div class="tooltip"><span class="${cls}">${sign}${pct.toFixed(0)}%</span><span class="tip">${t('Einstand')}: ${formatEUR(p.buy_price, 2)}<br>${sign}${formatEUR(abs)}</span></div>`;
+}
+
 function thesisCell(p) {
   const th = p.thesis;
   if (!th || !th.verdict) return '<span class="text-gray-500">—</span>';
@@ -530,6 +547,8 @@ async function submitAdd() {
   status.textContent = t('⏳ Prüfe Ticker bei Yahoo...');
   const body = { ticker };
   if (sharesStr) body.shares = parseFloat(sharesStr.replace(',', '.'));
+  const buyStr = document.getElementById('add-buyprice').value.trim();
+  if (buyStr && sharesStr) body.buy_price = parseFloat(buyStr.replace(',', '.'));
   if (name) body.name = name;
   try {
     const resp = await fetch('/api/positions', {
@@ -542,6 +561,7 @@ async function submitAdd() {
     status.textContent = `✅ ${d.name} (${d.currency}) → ${d.list === 'portfolio' ? t('Depot') : t('Watchlist')}. ${t('Lade neu — Verlauf/Signale können beim ersten Mal 1–2 Min. brauchen.')}`;
     document.getElementById('add-ticker').value = '';
     document.getElementById('add-shares').value = '';
+    document.getElementById('add-buyprice').value = '';
     document.getElementById('add-name').value = '';
     setTimeout(loadPortfolio, 800);
   } catch (e) {
@@ -739,6 +759,7 @@ function renderTable() {
       <td class="px-4 py-3 text-right">
         <span class="text-xs">${Math.round(p.pct_of_portfolio)}%</span>
       </td>
+      <td class="px-4 py-3 text-right hide-mobile">${gainCell(p)}</td>
       <td class="px-4 py-3 text-right ${athClass}">
         <div class="tooltip">
           ${formatPct(p.ath_distance_pct)}
