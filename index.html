@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flatex Depot Tracker</title>
+<title>conviction</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -83,23 +83,25 @@
 <header class="bg-gray-800 border-b border-gray-700 px-3 md:px-6 py-4">
   <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-3 min-w-0">
     <div>
-      <h1 class="text-xl md:text-2xl font-bold">📊 Flatex Depot Tracker</h1>
+      <h1 class="text-xl md:text-2xl font-bold">📊 conviction
+        <button id="lang-toggle" onclick="toggleLang()" class="ml-2 px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-xs font-semibold align-middle" title="Sprache / Language">EN</button>
+      </h1>
       <p class="text-gray-400 text-sm" id="timestamp">Lade Daten...</p>
     </div>
     <div class="text-left md:text-right min-w-0">
       <div class="flex items-end gap-4 md:gap-6 justify-start md:justify-end flex-wrap">
         <div>
-          <div class="text-gray-400 text-sm">Gesamtwert</div>
+          <div class="text-gray-400 text-sm" data-i18n>Gesamtwert</div>
           <div class="text-2xl md:text-3xl font-bold text-green-400" id="total-value">—</div>
         </div>
         <div class="flex flex-nowrap gap-x-3 text-xs overflow-x-auto pb-1" id="perf-bars">
         <div class="text-center">
-          <div class="text-gray-500">1T</div>
+          <div class="text-gray-500" data-i18n>1T</div>
           <div id="perf-1d" class="font-semibold">—</div>
           <div id="perf-1d-pct" class="font-semibold">—</div>
         </div>
         <div class="text-center">
-          <div class="text-gray-500">7T</div>
+          <div class="text-gray-500" data-i18n>7T</div>
           <div id="perf-7d" class="font-semibold">—</div>
           <div id="perf-7d-pct" class="font-semibold">—</div>
         </div>
@@ -146,8 +148,8 @@
 
 <!-- Loading -->
 <div id="loading" class="loading text-center py-20 text-xl text-gray-400">
-  ⏳ Lade aktuelle Kurse...<br>
-  <span class="text-sm">Details und Analysten kommen danach</span>
+  <span data-i18n>⏳ Lade aktuelle Kurse...</span><br>
+  <span class="text-sm" data-i18n>Details und Analysten kommen danach</span>
 </div>
 
 <!-- Main Content -->
@@ -155,10 +157,10 @@
 
   <!-- Tabs -->
   <div class="flex flex-wrap gap-1 md:gap-2 mb-4 md:mb-6">
-    <div class="tab active" onclick="showTab('table')">📋 Tabelle</div>
-    <div class="tab" onclick="showTab('chart')">📈 Chart</div>
-    <div class="tab" onclick="showTab('analysts')">🎯 Analysten</div>
-    <div class="tab" onclick="showTab('rebalance')">⚖️ Rebalancing</div>
+    <div class="tab active" onclick="showTab('table')" data-i18n>📋 Tabelle</div>
+    <div class="tab" onclick="showTab('chart')" data-i18n>📈 Chart</div>
+    <div class="tab" onclick="showTab('analysts')" data-i18n>🎯 Analysten</div>
+    <div class="tab" onclick="showTab('rebalance')" data-i18n>⚖️ Rebalancing</div>
   </div>
 
   <!-- Tab: Tabelle -->
@@ -169,38 +171,39 @@
     <div id="add-form" class="hidden bg-gray-800 rounded-xl p-4 mb-3">
       <div class="flex flex-wrap gap-3 items-end">
         <div>
-          <label class="text-xs text-gray-400 block mb-1">Ticker (Yahoo Finance)</label>
+          <label class="text-xs text-gray-400 block mb-1" data-i18n>Ticker (Yahoo Finance)</label>
           <input id="add-ticker" class="bg-gray-700 rounded px-2 py-1 text-sm w-32" placeholder="z.B. IFX.DE">
         </div>
         <div>
-          <label class="text-xs text-gray-400 block mb-1">Stück (leer = Watchlist)</label>
+          <label class="text-xs text-gray-400 block mb-1" data-i18n>Stück (leer = Watchlist)</label>
           <input id="add-shares" type="number" step="any" min="0" class="bg-gray-700 rounded px-2 py-1 text-sm w-36" placeholder="z.B. 50">
         </div>
         <div>
-          <label class="text-xs text-gray-400 block mb-1">Name (optional, sonst von Yahoo)</label>
+          <label class="text-xs text-gray-400 block mb-1" data-i18n>Name (optional, sonst von Yahoo)</label>
           <input id="add-name" class="bg-gray-700 rounded px-2 py-1 text-sm w-44" placeholder="Anzeigename">
         </div>
-        <button onclick="submitAdd()" class="px-3 py-1 rounded bg-green-600 hover:bg-green-500 text-sm font-semibold">Hinzufügen</button>
+        <button onclick="submitAdd()" class="px-3 py-1 rounded bg-green-600 hover:bg-green-500 text-sm font-semibold" data-i18n>Hinzufügen</button>
       </div>
-      <div id="add-status" class="text-xs text-gray-400 mt-2">Währung wird automatisch von Yahoo erkannt. Mit Stück → Depot, ohne Stück → Watchlist. Löschen: Zeile anfassen und ✕ klicken.</div>
+      <div id="add-status" class="text-xs text-gray-400 mt-2" data-i18n>Währung wird automatisch von Yahoo erkannt. Mit Stück → Depot, ohne Stück → Watchlist. Löschen: Zeile anfassen und ✕ klicken.</div>
     </div>
     <div class="bg-gray-800 rounded-xl table-scroll">
       <table class="w-full text-sm">
         <thead>
           <tr class="bg-gray-700 text-gray-300">
-            <th class="px-4 py-3 text-left" onclick="sortTable('name')">Position</th>
-            <th class="px-4 py-3 text-right" onclick="sortTable('price_eur')" title="Aktueller Marktkurs in EUR (Yahoo Finance, max. 15 Min. alt). NICHT der Kaufkurs.">Kurs €</th>
-            <th class="px-4 py-3 text-right" onclick="sortTable('value_eur')" title="Automatisch berechnet: Stück × aktueller Kurs, in Tausend EUR">Wert k€</th>
-            <th class="px-4 py-3 text-right" onclick="sortTable('pct_of_portfolio')" title="Automatisch berechnet: Anteil am Gesamtdepot">Anteil</th>
-            <th class="px-4 py-3 text-right" onclick="sortTable('ath_distance_pct')">vs. ATH</th>
-            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kgv')">KGV</th>
-            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kvb')">KBV</th>
+            <th class="px-4 py-3 text-left" onclick="sortTable('name')" data-i18n>Position</th>
+            <th class="px-4 py-3 text-right" onclick="sortTable('price_eur')" title="Aktueller Marktkurs (Yahoo Finance, max. 15 Min. alt). NICHT der Kaufkurs." data-i18n>Kurs €</th>
+            <th class="px-4 py-3 text-right" onclick="sortTable('value_eur')" title="Automatisch berechnet: Stück × aktueller Kurs, in Tausend" data-i18n>Wert k€</th>
+            <th class="px-4 py-3 text-right" onclick="sortTable('pct_of_portfolio')" title="Automatisch berechnet: Anteil am Gesamtdepot" data-i18n>Anteil</th>
+            <th class="px-4 py-3 text-right" onclick="sortTable('ath_distance_pct')" data-i18n>vs. ATH</th>
+            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kgv')" data-i18n>KGV</th>
+            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('kvb')" data-i18n>KBV</th>
             <th class="px-4 py-3 text-right cursor-pointer" onclick="toggleRsiInfo()" title="Relative Strength Index">RSI</th>
-            <th class="px-4 py-3 text-right hide-mobile" title="Kurs vs. SMA 50">vs.SMA50</th>
+            <th class="px-4 py-3 text-right hide-mobile" title="Kurs vs. SMA 50" data-i18n>vs.SMA50</th>
             <th class="px-4 py-3 text-center hide-mobile" title="SMA-Signal">📊 SMA</th>
-            <th class="px-4 py-3 text-right" onclick="sortTable('analyst_upside')">Kursziel</th>
-            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('spread')">Streuung</th>
-            <th class="px-4 py-3 text-center sparkline-cell">Verlauf</th>
+            <th class="px-4 py-3 text-right" onclick="sortTable('analyst_upside')" data-i18n>Kursziel</th>
+            <th class="px-4 py-3 text-right hide-mobile" onclick="sortTable('spread')" data-i18n>Streuung</th>
+            <th class="px-4 py-3 text-center" title="Agent-These via POST /api/thesis" data-i18n>These</th>
+            <th class="px-4 py-3 text-center sparkline-cell" data-i18n>Verlauf</th>
             <th class="px-4 py-3 text-center sparkline-cell">12M</th>
             <th class="px-2 py-3 text-center sparkline-cell">5J</th>
           </tr>
@@ -211,22 +214,23 @@
 
     <!-- Watchlist -->
     <div id="watchlist-section" class="mt-6 hidden">
-      <h2 class="text-lg font-bold text-white mb-3">👁️ Watchlist</h2>
+      <h2 class="text-lg font-bold text-white mb-3" data-i18n>👁️ Watchlist</h2>
       <div class="bg-gray-800 rounded-xl table-scroll">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-700 text-gray-300">
-              <th class="px-2 py-3 text-left">Position</th>
-              <th class="px-2 py-3 text-right">Kurs €</th>
-              <th class="px-2 py-3 text-right">vs. ATH</th>
-              <th class="px-2 py-3 text-right hide-mobile">KGV</th>
-              <th class="px-2 py-3 text-right hide-mobile">KBV</th>
+              <th class="px-2 py-3 text-left" data-i18n>Position</th>
+              <th class="px-2 py-3 text-right" data-i18n>Kurs €</th>
+              <th class="px-2 py-3 text-right" data-i18n>vs. ATH</th>
+              <th class="px-2 py-3 text-right hide-mobile" data-i18n>KGV</th>
+              <th class="px-2 py-3 text-right hide-mobile" data-i18n>KBV</th>
               <th class="px-2 py-3 text-right">RSI</th>
-              <th class="px-2 py-3 text-right hide-mobile">vs.SMA50</th>
+              <th class="px-2 py-3 text-right hide-mobile" data-i18n>vs.SMA50</th>
               <th class="px-2 py-3 text-right hide-mobile">📊SMA</th>
-              <th class="px-2 py-3 text-right">Kursziel</th>
-              <th class="px-2 py-3 text-right hide-mobile">Streuung</th>
-              <th class="px-2 py-3 text-center sparkline-cell">Verlauf</th>
+              <th class="px-2 py-3 text-right" data-i18n>Kursziel</th>
+              <th class="px-2 py-3 text-right hide-mobile" data-i18n>Streuung</th>
+              <th class="px-2 py-3 text-center" data-i18n>These</th>
+              <th class="px-2 py-3 text-center sparkline-cell" data-i18n>Verlauf</th>
               <th class="px-2 py-3 text-center sparkline-cell">12M</th>
               <th class="px-2 py-3 text-center sparkline-cell">5J</th>
             </tr>
@@ -244,7 +248,7 @@
         <button onclick="setChartPeriod('1m')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">1M</button>
         <button onclick="setChartPeriod('3m')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">3M</button>
         <button onclick="setChartPeriod('6m')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">6M</button>
-        <button onclick="setChartPeriod('1y')" class="px-3 py-1 rounded bg-blue-600 text-sm period-btn" data-active="true">1J</button>
+        <button onclick="setChartPeriod('1y')" class="px-3 py-1 rounded bg-blue-600 text-sm period-btn" data-active="true" data-i18n>1J</button>
         <button onclick="setChartPeriod('2y')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">2J</button>
         <button onclick="setChartPeriod('5y')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">5J</button>
         <button onclick="setChartPeriod('max')" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm period-btn">Max</button>
@@ -255,7 +259,7 @@
 
     <!-- Detail-Chart mit SMA -->
     <div class="bg-gray-800 rounded-xl p-3 md:p-6 mt-4">
-      <h3 class="text-lg font-bold mb-3">📈 Detail mit SMA 50/200</h3>
+      <h3 class="text-lg font-bold mb-3" data-i18n>📈 Detail mit SMA 50/200</h3>
       <div class="mb-3">
         <select id="sma-ticker-select" onchange="updateSmaChart()" class="bg-gray-700 text-white text-sm px-3 py-1 rounded">
         </select>
@@ -277,8 +281,8 @@
   <!-- Tab: Rebalancing -->
   <div id="tab-rebalance" class="hidden">
     <div class="bg-gray-800 rounded-xl p-3 md:p-6">
-      <h2 class="text-xl font-bold mb-4">⚖️ Rebalancing-Vorschlag</h2>
-      <p class="text-gray-400 mb-6">Basierend auf einer diversifizierten Allokation</p>
+      <h2 class="text-xl font-bold mb-4" data-i18n>⚖️ Rebalancing-Vorschlag</h2>
+      <p class="text-gray-400 mb-6" data-i18n>Basierend auf einer diversifizierten Allokation</p>
       <div id="rebalance-content"></div>
     </div>
   </div>
@@ -289,6 +293,117 @@
 // Touch devices: skip the huge hover-zoom canvases (useless without hover,
 // and ~90 of them blow iOS Safari's canvas memory limit -> tab crash)
 const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700;
+
+// ─── Config (base currency, buy rules) from /api/config, safe defaults as fallback ───
+let APP_CONFIG = {
+  base_currency: 'EUR', symbol: '€', language: 'de',
+  buy_rules: {
+    rsi: { buy_below: 30, avoid_above: 70 },
+    kgv: { cheap_below: 15, expensive_above: 25 },
+    kbv: { cheap_below: 1.5, expensive_above: 3 },
+    vs_sma50: { ideal_band: 2, stretched_above: 8 },
+    ath: { strong_buy_below: -50, buy_band: [-30, -20] }
+  }
+};
+function BR() { return APP_CONFIG.buy_rules; }
+function SYM() { return APP_CONFIG.symbol || '€'; }
+
+// ─── i18n: German strings are the keys; EN via dictionary ───
+let LANG = localStorage.getItem('lang') || null;
+const L_EN = {
+  'Lade Daten...': 'Loading data...',
+  '⏳ Lade aktuelle Kurse...': '⏳ Loading current prices...',
+  'Details und Analysten kommen danach': 'details and analyst data follow',
+  '📋 Tabelle': '📋 Table', '📈 Chart': '📈 Chart', '🎯 Analysten': '🎯 Analysts', '⚖️ Rebalancing': '⚖️ Rebalancing',
+  'Gesamtwert': 'Total value', 'Stand': 'As of', '⚡ Lade Details...': '⚡ loading details...',
+  '1T': '1D', '7T': '7D',
+  'Position': 'Position', 'Kurs €': 'Price', 'Wert k€': 'Value k', 'Anteil': 'Weight',
+  'vs. ATH': 'vs. ATH', 'KGV': 'P/E', 'KBV': 'P/B', 'vs.SMA50': 'vs.SMA50', '📊 SMA': '📊 SMA',
+  'Kursziel': 'Target', 'Streuung': 'Spread', 'These': 'Thesis', 'Verlauf': 'Trend', '12M': '12M', '5J': '5Y',
+  '👁️ Watchlist': '👁️ Watchlist',
+  '＋ Position': '＋ Position', 'Hinzufügen': 'Add',
+  'Ticker (Yahoo Finance)': 'Ticker (Yahoo Finance)',
+  'Stück (leer = Watchlist)': 'Shares (empty = watchlist)',
+  'Name (optional, sonst von Yahoo)': 'Name (optional, else from Yahoo)',
+  'Währung wird automatisch von Yahoo erkannt. Mit Stück → Depot, ohne Stück → Watchlist. Löschen: Zeile anfassen und ✕ klicken.':
+    'Currency is auto-detected from Yahoo. With shares → portfolio, without → watchlist. Delete: hover a row and click ✕.',
+  '❌ Ticker fehlt': '❌ Ticker missing', '⏳ Prüfe Ticker bei Yahoo...': '⏳ Validating ticker with Yahoo...',
+  'Depot': 'Portfolio', 'Watchlist': 'Watchlist',
+  'Lade neu — Verlauf/Signale können beim ersten Mal 1–2 Min. brauchen.': 'Reloading — history/signals can take 1–2 min the first time.',
+  'wirklich': 'really', 'aus dem Depot entfernen': 'remove from portfolio', 'von der Watchlist entfernen': 'remove from watchlist',
+  'Fehler beim Entfernen': 'Failed to remove',
+  'KAUFEN': 'BUY', 'VERKAUFEN': 'SELL', 'HALTEN': 'HOLD',
+  'Kauf-Watch': 'Buy watch', 'Warten': 'Wait', 'Zu heiß': 'Too hot', 'Bedingt': 'Conditional', 'Verkauf-Watch': 'Sell watch',
+  'Agent': 'Agent', 'These älter als 30 Tage': 'thesis older than 30 days',
+  'Analysten-Zielkorridor': 'Analyst target corridor', 'Aktuell': 'Current', 'Mittel': 'Mean',
+  'Analysten': 'Analysts', 'Holdings analysiert': 'holdings analyzed',
+  'Impliziertes Kursziel (aus Top-Holdings)': 'Implied target (from top holdings)', 'Kursziel (Median)': 'Price target (median)',
+  '📈 Kursverlauf 12 Monate': '📈 Price history 12 months',
+  '⚖️ Rebalancing-Vorschlag': '⚖️ Rebalancing suggestion',
+  'Basierend auf einer diversifizierten Allokation': 'Based on a diversified allocation',
+  '↓ Verkaufen': '↓ Sell', '↑ Kaufen': '↑ Buy', 'Ziel': 'Target',
+  '📊 Zusammenfassung': '📊 Summary',
+  '📈 Detail mit SMA 50/200': '📈 Detail with SMA 50/200',
+  '⬜ SMA 200': '⬜ SMA 200', '🟨 SMA 50': '🟨 SMA 50', '⬜ Kurs': '⬜ Price',
+  '1J': '1Y', '5J-Btn': '5Y', 'Min': 'Min', 'Max': 'Max',
+  'Weltweite Aktien-ETFs': 'Global equity ETFs', 'Big Tech Einzeltitel': 'Big tech single stocks',
+  'Bitcoin/Krypto': 'Bitcoin/crypto', 'Anleihen/Defensiv': 'Bonds/defensive', 'EM/Schwellenländer': 'Emerging markets', 'Sonstiges': 'Other',
+};
+function t(s) { return LANG === 'en' ? (L_EN[s] !== undefined ? L_EN[s] : s) : s; }
+
+function applyLang() {
+  document.documentElement.lang = LANG;
+  const btn = document.getElementById('lang-toggle');
+  if (btn) btn.textContent = LANG === 'en' ? 'DE' : 'EN';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    if (el.dataset.de === undefined) el.dataset.de = el.textContent.trim();
+    el.textContent = t(el.dataset.de);
+  });
+}
+
+function toggleLang() {
+  LANG = LANG === 'en' ? 'de' : 'en';
+  localStorage.setItem('lang', LANG);
+  applyLang();
+  if (portfolioData.length) {
+    renderTable(); renderWatchlist();
+    drawSparklines(); drawSparklines12m(); drawSparklines5y();
+    drawWatchlistSparklines(); drawWatchlistSparklines12m(); drawWatchlistSparklines5y();
+    positionTooltips(); renderAnalystCards(); renderRebalance();
+  }
+}
+
+// ─── Rule-driven tooltip texts (generated from APP_CONFIG.buy_rules) ───
+const RULE_TXT = {
+  rsi: r => LANG === 'en'
+    ? `RSI buy rule:<br>✅ below ${r.rsi.buy_below} → buy<br>⏸️ ${r.rsi.buy_below}–50 → wait<br>⏸️ 50–${r.rsi.avoid_above} → don't buy (trend running, too late)<br>❌ above ${r.rsi.avoid_above} → don't buy<br><br>Rule of thumb: only buy when everyone sells (RSI &lt; ${r.rsi.buy_below}).`
+    : `RSI Kaufregel:<br>✅ unter ${r.rsi.buy_below} → Kaufen<br>⏸️ ${r.rsi.buy_below}–50 → Warten<br>⏸️ 50–${r.rsi.avoid_above} → Nicht kaufen (Trend läuft, aber zu spät)<br>❌ über ${r.rsi.avoid_above} → Nicht kaufen<br><br>Merksatz: Kaufe nur, wenn alle verkaufen (RSI &lt; ${r.rsi.buy_below}).`,
+  kgv: r => LANG === 'en'
+    ? `P/E buy rule:<br>✅ below ${r.kgv.cheap_below} → cheap<br>⏸️ ${r.kgv.cheap_below}–${r.kgv.expensive_above} → caution<br>❌ above ${r.kgv.expensive_above} → don't buy`
+    : `KGV Kaufregel:<br>✅ unter ${r.kgv.cheap_below} → günstig<br>⏸️ ${r.kgv.cheap_below}–${r.kgv.expensive_above} → Vorsicht<br>❌ über ${r.kgv.expensive_above} → nicht kaufen`,
+  kbv: r => LANG === 'en'
+    ? `P/B buy rule:<br>✅ below ${r.kbv.cheap_below} → cheap<br>⏸️ ${r.kbv.cheap_below}–${r.kbv.expensive_above} → caution<br>❌ above ${r.kbv.expensive_above} → don't buy<br><br>⚠ A low P/E or P/B can be a value trap. Always ask: why is it this cheap?`
+    : `KBV Kaufregel:<br>✅ unter ${r.kbv.cheap_below} → günstig<br>⏸️ ${r.kbv.cheap_below}–${r.kbv.expensive_above} → Vorsicht<br>❌ über ${r.kbv.expensive_above} → nicht kaufen<br><br>⚠ Niedriges KGV/KBV kann eine Value-Trap sein. Immer prüfen: Warum ist es so billig?`,
+  ath: r => LANG === 'en'
+    ? `Buy rule price vs. ATH:<br>✅ ${r.ath.strong_buy_below}%+ off ATH → buy (if the business is solid)<br>✅ ${r.ath.buy_band[0]} to ${r.ath.buy_band[1]}% off ATH → buy (healthy pullback)<br>⏸️ -10–20% → ok, higher risk<br>⏸️ -5–10% → wait (correction may deepen)<br>❌ at the ATH → don't buy (overheated)<br><br>Rule of thumb: buy at a discount to the ATH, not at the top.`
+    : `Kaufregel Kurs vs. ATH:<br>✅ ${r.ath.strong_buy_below}%+ vom ATH → Kaufen (wenn Unternehmen solide)<br>✅ ${r.ath.buy_band[0]} bis ${r.ath.buy_band[1]}% vom ATH → Kaufen (gesunder Rücksetzer)<br>⏸️ -10–20% vom ATH → Ok, aber Risiko höher<br>⏸️ -5–10% vom ATH → Warten (Korrektur kann tiefer gehen)<br>❌ Am ATH → Nicht kaufen (überhitzt)<br><br>Merksatz: Kaufe bei Rabatt vom ATH, nicht am Höchststand.`,
+  sma50: r => LANG === 'en'
+    ? `Buy rule price vs. SMA 50:<br>✅ below SMA 50 (5–10%) → buy, cheap entry<br>✅ at the SMA 50 (±${r.vs_sma50.ideal_band}%) → buy, best entry in an uptrend<br>⏸️ slightly above (${r.vs_sma50.ideal_band}–5%) → ok, not ideal<br>❌ far above (>${r.vs_sma50.stretched_above}%) → wait, pullback likely<br><br>Rule of thumb: buy near the SMA 50, not far above it.<br><br>Extra rule: only buy when SMA 50 &gt; SMA 200 (uptrend).`
+    : `Kaufregel Kurs vs. SMA 50:<br>✅ unter SMA 50 (5–10%) → Kaufen – günstiger Einstieg<br>✅ am SMA 50 (±${r.vs_sma50.ideal_band}%) → Kaufen – bester Einstieg im Aufwärtstrend<br>⏸️ knapp über SMA 50 (${r.vs_sma50.ideal_band}–5%) → Ok, aber nicht ideal<br>❌ weit über SMA 50 (>${r.vs_sma50.stretched_above}%) → Warten – Rücksetzer kommt meist<br><br>Merksatz: Kaufe nahe am SMA 50, nicht weit darüber.<br><br>Zusatzregel: Kaufe nur, wenn SMA 50 > SMA 200 (Aufwärtstrend).`,
+};
+
+// ─── Thesis column (agent write-back via POST /api/thesis) ───
+const VERDICT_LABEL = { 'buy-watch': 'Kauf-Watch', 'wait': 'Warten', 'too-hot': 'Zu heiß', 'conditional': 'Bedingt', 'sell-watch': 'Verkauf-Watch' };
+const VERDICT_CLS = { 'buy-watch': 'text-green-400', 'wait': 'text-yellow-400', 'too-hot': 'text-red-400', 'conditional': 'text-orange-300', 'sell-watch': 'text-red-300' };
+function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function thesisCell(p) {
+  const th = p.thesis;
+  if (!th || !th.verdict) return '<span class="text-gray-500">—</span>';
+  const ageDays = Math.round((Date.now() - new Date(th.date || th.updated_at)) / 86400000);
+  const stale = isFinite(ageDays) && ageDays > 30;
+  const label = t(VERDICT_LABEL[th.verdict] || th.verdict);
+  return `<div class="tooltip"><span class="${VERDICT_CLS[th.verdict] || 'text-gray-300'} ${stale ? 'opacity-50' : ''} text-xs font-semibold">${label}${stale ? ' ⌛' : ''}</span><span class="tip">${escHtml(th.rationale || '')}<br><br>${t('Agent')}: ${escHtml(th.author || '?')} · ${th.date || ''}${stale ? '<br>⚠ ' + t('These älter als 30 Tage') : ''}</span></div>`;
+}
 
 let portfolioData = [];
 let watchlistData = [];
@@ -307,15 +422,23 @@ const COLORS = [
 
 async function loadPortfolio() {
   try {
+    // Phase 0: config (buy rules, base currency, language) — cheap, cached backend-side
+    try {
+      const cfg = await (await fetch('/api/config')).json();
+      APP_CONFIG = { ...APP_CONFIG, ...cfg, buy_rules: { ...APP_CONFIG.buy_rules, ...(cfg.buy_rules || {}) } };
+    } catch (e) { /* defaults stay */ }
+    if (!LANG) LANG = APP_CONFIG.language || ((navigator.language || 'en').startsWith('de') ? 'de' : 'en');
+    applyLang();
+
     // Phase 1: Load lite data (prices only) — fast (~2s)
     const liteResp = await fetch('/api/portfolio-lite');
     const liteData = await liteResp.json();
-    
+
     // Show prices immediately
     portfolioData = liteData.portfolio;
-    document.getElementById('total-value').textContent = Math.round(liteData.total_value_eur / 1000).toLocaleString('de-DE') + 'k';
+    document.getElementById('total-value').textContent = Math.round(liteData.total_value_eur / 1000).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') + 'k';
     document.getElementById('timestamp').textContent =
-      `Stand: ${new Date(liteData.timestamp).toLocaleString('de-DE')} | EUR/USD: ${liteData.eurusd} | ⚡ Lade Details...`;
+      `${t('Stand')}: ${new Date(liteData.timestamp).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE')} | EUR/USD: ${liteData.eurusd} | ${t('⚡ Lade Details...')}`;
     
     // Render table with prices immediately (no sparklines/analysts yet)
     renderTable();
@@ -328,9 +451,9 @@ async function loadPortfolio() {
     portfolioData = data.portfolio;
     watchlistData = data.watchlist || [];
 
-    document.getElementById('total-value').textContent = Math.round(data.total_value_eur / 1000).toLocaleString('de-DE') + 'k';
+    document.getElementById('total-value').textContent = Math.round(data.total_value_eur / 1000).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') + 'k';
     document.getElementById('timestamp').textContent =
-      `Stand: ${new Date(data.timestamp).toLocaleString('de-DE')} | EUR/USD: ${data.eurusd}`;
+      `${t('Stand')}: ${new Date(data.timestamp).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE')} | EUR/USD: ${data.eurusd}`;
 
     // Performance bars
     const perf1d = document.getElementById('perf-1d');
@@ -403,8 +526,8 @@ async function submitAdd() {
   const ticker = document.getElementById('add-ticker').value.trim();
   const sharesStr = document.getElementById('add-shares').value.trim();
   const name = document.getElementById('add-name').value.trim();
-  if (!ticker) { status.textContent = '❌ Ticker fehlt'; return; }
-  status.textContent = '⏳ Prüfe Ticker bei Yahoo...';
+  if (!ticker) { status.textContent = t('❌ Ticker fehlt'); return; }
+  status.textContent = t('⏳ Prüfe Ticker bei Yahoo...');
   const body = { ticker };
   if (sharesStr) body.shares = parseFloat(sharesStr.replace(',', '.'));
   if (name) body.name = name;
@@ -415,8 +538,8 @@ async function submitAdd() {
       body: JSON.stringify(body)
     });
     const d = await resp.json();
-    if (!resp.ok) { status.textContent = '❌ ' + (d.detail || 'Fehler'); return; }
-    status.textContent = `✅ ${d.name} (${d.currency}) → ${d.list === 'portfolio' ? 'Depot' : 'Watchlist'}. Lade neu — Verlauf/Signale können beim ersten Mal 1–2 Min. brauchen.`;
+    if (!resp.ok) { status.textContent = '❌ ' + (d.detail || (LANG === 'en' ? 'Error' : 'Fehler')); return; }
+    status.textContent = `✅ ${d.name} (${d.currency}) → ${d.list === 'portfolio' ? t('Depot') : t('Watchlist')}. ${t('Lade neu — Verlauf/Signale können beim ersten Mal 1–2 Min. brauchen.')}`;
     document.getElementById('add-ticker').value = '';
     document.getElementById('add-shares').value = '';
     document.getElementById('add-name').value = '';
@@ -427,16 +550,19 @@ async function submitAdd() {
 }
 
 async function deletePosition(list, ticker) {
-  const label = list === 'portfolio' ? 'aus dem Depot' : 'von der Watchlist';
-  if (!confirm(`${ticker} wirklich ${label} entfernen?`)) return;
+  const q = LANG === 'en'
+    ? `Really ${list === 'portfolio' ? 'remove ' + ticker + ' from the portfolio' : 'remove ' + ticker + ' from the watchlist'}?`
+    : `${ticker} wirklich ${list === 'portfolio' ? 'aus dem Depot' : 'von der Watchlist'} entfernen?`;
+  if (!confirm(q)) return;
   const resp = await fetch(`/api/positions/${list}/${encodeURIComponent(ticker)}`, { method: 'DELETE' });
   if (resp.ok) loadPortfolio();
-  else alert('Fehler beim Entfernen: ' + ((await resp.json()).detail || resp.status));
+  else alert(t('Fehler beim Entfernen') + ': ' + ((await resp.json()).detail || resp.status));
 }
 
 function formatEUR(n, decimals) {
   const frac = decimals !== undefined ? decimals : 0;
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: frac }).format(n);
+  return new Intl.NumberFormat(LANG === 'en' ? 'en-US' : 'de-DE',
+    { style: 'currency', currency: APP_CONFIG.base_currency || 'EUR', maximumFractionDigits: frac }).format(n);
 }
 
 function formatPct(n) {
@@ -451,28 +577,29 @@ function formatK(n) {
 }
 
 function getRecommendation(rec, current, targetMean) {
-  if (rec === 'strong_buy' || rec === 'buy') return { text: 'KAUFEN', cls: 'recommendation-buy', emoji: '🟢' };
-  if (rec === 'sell' || rec === 'strong_sell') return { text: 'VERKAUFEN', cls: 'recommendation-sell', emoji: '🔴' };
+  if (rec === 'strong_buy' || rec === 'buy') return { text: t('KAUFEN'), cls: 'recommendation-buy', emoji: '🟢' };
+  if (rec === 'sell' || rec === 'strong_sell') return { text: t('VERKAUFEN'), cls: 'recommendation-sell', emoji: '🔴' };
   if (targetMean && current) {
     const upside = (targetMean / current - 1) * 100;
-    if (upside > 15) return { text: 'KAUFEN', cls: 'recommendation-buy', emoji: '🟢' };
-    if (upside < -10) return { text: 'VERKAUFEN', cls: 'recommendation-sell', emoji: '🔴' };
+    if (upside > 15) return { text: t('KAUFEN'), cls: 'recommendation-buy', emoji: '🟢' };
+    if (upside < -10) return { text: t('VERKAUFEN'), cls: 'recommendation-sell', emoji: '🔴' };
   }
-  return { text: 'HALTEN', cls: 'recommendation-hold', emoji: '🟡' };
+  return { text: t('HALTEN'), cls: 'recommendation-hold', emoji: '🟡' };
 }
 
 // ─── RSI Anzeige ───
 function rsiAnzeige(rsi) {
   if (rsi == null) return '<span class="text-gray-500">—</span>';
+  const r = BR();
   let cls = 'text-gray-300';
   let signal = '';
-  if (rsi >= 70) { cls = 'text-red-400 font-bold'; signal = '❌ Nicht kaufen — überkauft'; }
-  else if (rsi >= 50) { cls = 'text-yellow-400'; signal = '⏸️ Nicht kaufen — Trend läuft, aber zu spät'; }
-  else if (rsi >= 30) { cls = 'text-gray-300'; signal = '⏸️ Warten — noch nicht tief genug'; }
-  else { cls = 'text-green-400 font-bold'; signal = '✅ Kaufen — überverkauft!'; }
+  if (rsi >= r.rsi.avoid_above) { cls = 'text-red-400 font-bold'; signal = LANG === 'en' ? "❌ Don't buy — overbought" : '❌ Nicht kaufen — überkauft'; }
+  else if (rsi >= 50) { cls = 'text-yellow-400'; signal = LANG === 'en' ? "⏸️ Don't buy — trend running, too late" : '⏸️ Nicht kaufen — Trend läuft, aber zu spät'; }
+  else if (rsi >= r.rsi.buy_below) { cls = 'text-gray-300'; signal = LANG === 'en' ? '⏸️ Wait — not deep enough yet' : '⏸️ Warten — noch nicht tief genug'; }
+  else { cls = 'text-green-400 font-bold'; signal = LANG === 'en' ? '✅ Buy — oversold!' : '✅ Kaufen — überverkauft!'; }
   return `<div class="tooltip">
     <span class="${cls}">${Math.round(rsi)}</span>
-    <span class="tip">RSI Kaufregel:<br>✅ unter 30 → Kaufen<br>⏸️ 30–50 → Warten<br>⏸️ 50–70 → Nicht kaufen (Trend läuft, aber zu spät)<br>❌ über 70 → Nicht kaufen<br><br>Aktuell: ${signal}<br><br>Merksatz: Kaufe nur, wenn alle verkaufen (RSI &lt; 30).</span>
+    <span class="tip">${RULE_TXT.rsi(r)}<br><br>${t('Aktuell')}: ${signal}</span>
   </div>`;
 }
 
@@ -484,15 +611,25 @@ function toggleRsiInfo() {
   const div = document.createElement('div');
   div.id = 'rsi-info';
   div.className = 'bg-gray-700 rounded-lg p-4 mb-3 text-sm';
-  div.innerHTML = `
+  const r = BR();
+  div.innerHTML = LANG === 'en' ? `
+    <div class="font-bold text-white mb-2">📊 RSI buy rule — simple</div>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-1">
+      <div><span class="text-green-400 font-bold">below ${r.rsi.buy_below}</span> ✅ Buy</div>
+      <div><span class="text-yellow-400 font-bold">${r.rsi.buy_below}–50</span> ⏸️ Wait</div>
+      <div><span class="text-orange-400 font-bold">50–${r.rsi.avoid_above}</span> ⏸️ Don't buy (trend running, too late)</div>
+      <div><span class="text-red-400 font-bold">above ${r.rsi.avoid_above}</span> ❌ Don't buy</div>
+    </div>
+    <div class="mt-2 text-gray-400 italic">Rule of thumb: only buy when everyone sells (RSI &lt; ${r.rsi.buy_below}).</div>
+  ` : `
     <div class="font-bold text-white mb-2">📊 RSI Kaufregel – simpel</div>
     <div class="grid grid-cols-2 gap-x-6 gap-y-1">
-      <div><span class="text-green-400 font-bold">unter 30</span> ✅ Kaufen</div>
-      <div><span class="text-yellow-400 font-bold">30–50</span> ⏸️ Warten</div>
-      <div><span class="text-orange-400 font-bold">50–70</span> ⏸️ Nicht kaufen (Trend läuft, aber zu spät)</div>
-      <div><span class="text-red-400 font-bold">über 70</span> ❌ Nicht kaufen</div>
+      <div><span class="text-green-400 font-bold">unter ${r.rsi.buy_below}</span> ✅ Kaufen</div>
+      <div><span class="text-yellow-400 font-bold">${r.rsi.buy_below}–50</span> ⏸️ Warten</div>
+      <div><span class="text-orange-400 font-bold">50–${r.rsi.avoid_above}</span> ⏸️ Nicht kaufen (Trend läuft, aber zu spät)</div>
+      <div><span class="text-red-400 font-bold">über ${r.rsi.avoid_above}</span> ❌ Nicht kaufen</div>
     </div>
-    <div class="mt-2 text-gray-400 italic">Merksatz: Kaufe nur, wenn alle verkaufen (RSI &lt; 30).</div>
+    <div class="mt-2 text-gray-400 italic">Merksatz: Kaufe nur, wenn alle verkaufen (RSI &lt; ${r.rsi.buy_below}).</div>
   `;
   table.before(div);
   sortTable('rsi');
@@ -501,18 +638,20 @@ function toggleRsiInfo() {
 function vsSma50(p) {
   const v = p.price_vs_sma50_pct;
   if (v == null) return '<span class="text-gray-500">—</span>';
+  const r = BR();
+  const band = r.vs_sma50.ideal_band, stretched = r.vs_sma50.stretched_above;
   const sign = v >= 0 ? '+' : '';
   let cls = 'text-gray-300';
   let signal = '';
-  if (v > 8) { cls = 'text-red-400'; signal = '❌ Warten – Rücksetzer kommt meist'; }
-  else if (v > 5) { cls = 'text-yellow-400'; signal = '⏸️ Ok, aber nicht ideal'; }
-  else if (v > 2) { cls = 'text-gray-300'; signal = '⏸️ Ok, aber nicht ideal'; }
-  else if (v >= -2) { cls = 'text-green-400 font-bold'; signal = '✅ Kaufen – bester Einstieg im Aufwärtstrend'; }
-  else if (v >= -10) { cls = 'text-green-400'; signal = '✅ Kaufen – günstiger Einstieg'; }
-  else { cls = 'text-green-300'; signal = '✅ Kaufen – günstiger Einstieg'; }
+  if (v > stretched) { cls = 'text-red-400'; signal = LANG === 'en' ? '❌ Wait — pullback likely' : '❌ Warten – Rücksetzer kommt meist'; }
+  else if (v > 5) { cls = 'text-yellow-400'; signal = LANG === 'en' ? '⏸️ Ok, not ideal' : '⏸️ Ok, aber nicht ideal'; }
+  else if (v > band) { cls = 'text-gray-300'; signal = LANG === 'en' ? '⏸️ Ok, not ideal' : '⏸️ Ok, aber nicht ideal'; }
+  else if (v >= -band) { cls = 'text-green-400 font-bold'; signal = LANG === 'en' ? '✅ Buy — best entry in an uptrend' : '✅ Kaufen – bester Einstieg im Aufwärtstrend'; }
+  else if (v >= -10) { cls = 'text-green-400'; signal = LANG === 'en' ? '✅ Buy — cheap entry' : '✅ Kaufen – günstiger Einstieg'; }
+  else { cls = 'text-green-300'; signal = LANG === 'en' ? '✅ Buy — cheap entry' : '✅ Kaufen – günstiger Einstieg'; }
   return `<div class="tooltip">
     <span class="${cls}">${sign}${v}%</span>
-    <span class="tip">Kaufregel Kurs vs. SMA 50:<br>✅ unter SMA 50 (5–10%) → Kaufen – günstiger Einstieg<br>✅ am SMA 50 (±2%) → Kaufen – bester Einstieg im Aufwärtstrend<br>⏸️ knapp über SMA 50 (2–5%) → Ok, aber nicht ideal<br>❌ weit über SMA 50 (>8%) → Warten – Rücksetzer kommt meist<br><br>Aktuell: ${signal}<br><br>Merksatz: Kaufe nahe am SMA 50, nicht weit darüber.<br><br>Zusatzregel: Kaufe nur, wenn SMA 50 > SMA 200 (Aufwärtstrend).</span>
+    <span class="tip">${RULE_TXT.sma50(r)}<br><br>${t('Aktuell')}: ${signal}</span>
   </div>`;
 }
 
@@ -524,13 +663,24 @@ function smaAmpel(p) {
   if (!sig) return '<span class="text-gray-500">—</span>';
 
   let signal = '';
-  if (diff > 15) signal = '🔴 Überhitzt ❌ Warten – Pullback kommt';
-  else if (diff > 5) signal = '🟢 Gesund ✅ Kaufen – Trend läuft';
-  else if (diff >= 0) signal = '🟢 Frisch ✅ Kaufen – Golden Cross Zone';
-  else if (diff >= -5) signal = '🟡 Schwach ⏸️ Warten – Abwärtstrend beginnt';
-  else signal = '🔴 Bärisch ❌ Nicht kaufen';
+  if (LANG === 'en') {
+    if (diff > 15) signal = '🔴 Overheated ❌ Wait — pullback coming';
+    else if (diff > 5) signal = '🟢 Healthy ✅ Buy — trend running';
+    else if (diff >= 0) signal = '🟢 Fresh ✅ Buy — golden cross zone';
+    else if (diff >= -5) signal = '🟡 Weak ⏸️ Wait — downtrend starting';
+    else signal = "🔴 Bearish ❌ Don't buy";
+  } else {
+    if (diff > 15) signal = '🔴 Überhitzt ❌ Warten – Pullback kommt';
+    else if (diff > 5) signal = '🟢 Gesund ✅ Kaufen – Trend läuft';
+    else if (diff >= 0) signal = '🟢 Frisch ✅ Kaufen – Golden Cross Zone';
+    else if (diff >= -5) signal = '🟡 Schwach ⏸️ Warten – Abwärtstrend beginnt';
+    else signal = '🔴 Bärisch ❌ Nicht kaufen';
+  }
 
-  const tipText = `SMA 50: ${p.sma_50 ? Math.round(p.sma_50) : '—'} € | SMA 200: ${p.sma_200 ? Math.round(p.sma_200) : '—'} €<br><br>Kaufregel SMA 50 vs. SMA 200:<br>🔴 SMA50 > +15% über SMA200 → ❌ Warten – Pullback kommt<br>🟢 SMA50 +5 bis +15% über SMA200 → ✅ Kaufen – Trend läuft<br>🟢 SMA50 0 bis +5% über SMA200 → ✅ Kaufen – Golden Cross Zone<br>⚪ SMA50 ±0% (gleich) → ⏸️ Warten – Richtung unklar<br>🟡 SMA50 0 bis -5% unter SMA200 → ⏸️ Warten – Abwärtstrend beginnt<br>🔴 SMA50 < -5% unter SMA200 → ❌ Nicht kaufen<br><br>Aktuell: ${signal}<br><br>Merksatz: Golden Zone = SMA50 zwischen +5% und +15% über SMA200. Drüber = überhitzt, drunter = zu früh oder falscher Trend.`;
+  const smaVals = `SMA 50: ${p.sma_50 ? Math.round(p.sma_50) : '—'} ${SYM()} | SMA 200: ${p.sma_200 ? Math.round(p.sma_200) : '—'} ${SYM()}`;
+  const tipText = LANG === 'en'
+    ? `${smaVals}<br><br>Buy rule SMA 50 vs. SMA 200:<br>🔴 SMA50 > +15% above SMA200 → ❌ Wait — pullback coming<br>🟢 SMA50 +5 to +15% above → ✅ Buy — trend running<br>🟢 SMA50 0 to +5% above → ✅ Buy — golden cross zone<br>⚪ SMA50 ±0% → ⏸️ Wait — direction unclear<br>🟡 SMA50 0 to -5% below → ⏸️ Wait — downtrend starting<br>🔴 SMA50 < -5% below → ❌ Don't buy<br><br>Current: ${signal}<br><br>Rule of thumb: golden zone = SMA50 between +5% and +15% above SMA200. Above = overheated, below = too early or wrong trend.`
+    : `${smaVals}<br><br>Kaufregel SMA 50 vs. SMA 200:<br>🔴 SMA50 > +15% über SMA200 → ❌ Warten – Pullback kommt<br>🟢 SMA50 +5 bis +15% über SMA200 → ✅ Kaufen – Trend läuft<br>🟢 SMA50 0 bis +5% über SMA200 → ✅ Kaufen – Golden Cross Zone<br>⚪ SMA50 ±0% (gleich) → ⏸️ Warten – Richtung unklar<br>🟡 SMA50 0 bis -5% unter SMA200 → ⏸️ Warten – Abwärtstrend beginnt<br>🔴 SMA50 < -5% unter SMA200 → ❌ Nicht kaufen<br><br>Aktuell: ${signal}<br><br>Merksatz: Golden Zone = SMA50 zwischen +5% und +15% über SMA200. Drüber = überhitzt, drunter = zu früh oder falscher Trend.`;
 
   let cls = 'bg-gray-500';
   if (sig === 'golden_cross') cls = 'bg-green-500';
@@ -580,7 +730,7 @@ function renderTable() {
     const spreadClass = spread > 80 ? 'loss' : spread > 40 ? 'text-yellow-400' : 'gain';
     return `<tr class="border-t border-gray-700 hover:bg-gray-750 ${i < 3 ? 'bg-gray-800' : ''}">
       <td class="px-2 py-3" style="max-width:120px;overflow:hidden;position:relative">
-        <span class="del-btn" title="Aus dem Depot entfernen" onclick="deletePosition('portfolio','${p.ticker}')">✕</span>
+        <span class="del-btn" title="${LANG === 'en' ? 'Remove from portfolio' : 'Aus dem Depot entfernen'}" onclick="deletePosition('portfolio','${p.ticker}')">✕</span>
         <div class="font-semibold truncate">${p.short_name || p.name}</div>
         <div class="text-gray-500 text-xs">${p.shares.toLocaleString('de-DE', {maximumFractionDigits: p.shares < 10 ? 4 : 0})}x · ${p.ticker} ${isETF ? '📊' : p.ticker.startsWith('BTC') ? '₿' : '📈'}</div>
       </td>
@@ -592,19 +742,19 @@ function renderTable() {
       <td class="px-4 py-3 text-right ${athClass}">
         <div class="tooltip">
           ${formatPct(p.ath_distance_pct)}
-          <span class="tip">ATH: ${p.ath ? formatEUR(p.ath) : '—'} (${p.ath_date || '—'})<br><br>Kaufregel Kurs vs. ATH:<br>✅ -50%+ vom ATH → Kaufen (wenn Unternehmen solide)<br>✅ -20–30% vom ATH → Kaufen (gesunder Rücksetzer)<br>⏸️ -10–20% vom ATH → Ok, aber Risiko höher<br>⏸️ -5–10% vom ATH → Warten (Korrektur kann tiefer gehen)<br>❌ Am ATH → Nicht kaufen (überhitzt)<br><br>Merksatz: Kaufe bei Rabatt vom ATH, nicht am Höchststand.</span>
+          <span class="tip">ATH: ${p.ath ? formatEUR(p.ath) : '—'} (${p.ath_date || '—'})<br><br>${RULE_TXT.ath(BR())}</span>
         </div>
       </td>
       <td class="px-4 py-3 text-right hide-mobile">
         <div class="tooltip">
-          <span class="${p.kgv ? (p.kgv < 15 ? 'text-green-400' : p.kgv > 25 ? 'text-red-400' : 'text-yellow-400') : ''}">${p.kgv ? p.kgv.toFixed(1) : '—'}</span>
-          <span class="tip">KGV Kaufregel:<br>✅ unter 15 → günstig<br>⏸️ 15–25 → Vorsicht<br>❌ über 25 → nicht kaufen${p.kgv && p.kgv < 15 ? '<br><br>→ Günstiges KGV!' : p.kgv && p.kgv > 25 ? '<br><br>→ Teuer, nicht kaufen' : ''}</span>
+          <span class="${p.kgv ? (p.kgv < BR().kgv.cheap_below ? 'text-green-400' : p.kgv > BR().kgv.expensive_above ? 'text-red-400' : 'text-yellow-400') : ''}">${p.kgv ? p.kgv.toFixed(1) : '—'}</span>
+          <span class="tip">${RULE_TXT.kgv(BR())}${p.kgv && p.kgv < BR().kgv.cheap_below ? (LANG === 'en' ? '<br><br>→ Cheap P/E!' : '<br><br>→ Günstiges KGV!') : p.kgv && p.kgv > BR().kgv.expensive_above ? (LANG === 'en' ? "<br><br>→ Expensive, don't buy" : '<br><br>→ Teuer, nicht kaufen') : ''}</span>
         </div>
       </td>
       <td class="px-4 py-3 text-right hide-mobile">
         <div class="tooltip">
-          <span class="${p.kvb ? (p.kvb < 1.5 ? 'text-green-400' : p.kvb > 3 ? 'text-red-400' : 'text-yellow-400') : ''}">${p.kvb ? p.kvb.toFixed(1) : '—'}</span>
-          <span class="tip">KBV Kaufregel:<br>✅ unter 1,5 → günstig<br>⏸️ 1,5–3 → Vorsicht<br>❌ über 3 → nicht kaufen${p.kvb && p.kvb < 1.5 ? '<br><br>→ Günstiges KBV!' : p.kvb && p.kvb > 3 ? '<br><br>→ Teuer, nicht kaufen' : ''}<br><br>⚠ Niedriges KGV/KBV kann eine Value-Trap sein. Immer prüfen: Warum ist es so billig?</span>
+          <span class="${p.kvb ? (p.kvb < BR().kbv.cheap_below ? 'text-green-400' : p.kvb > BR().kbv.expensive_above ? 'text-red-400' : 'text-yellow-400') : ''}">${p.kvb ? p.kvb.toFixed(1) : '—'}</span>
+          <span class="tip">${RULE_TXT.kbv(BR())}${p.kvb && p.kvb < BR().kbv.cheap_below ? (LANG === 'en' ? '<br><br>→ Cheap P/B!' : '<br><br>→ Günstiges KBV!') : p.kvb && p.kvb > BR().kbv.expensive_above ? (LANG === 'en' ? "<br><br>→ Expensive, don't buy" : '<br><br>→ Teuer, nicht kaufen') : ''}</span>
         </div>
       </td>
       <td class="px-4 py-3 text-right">${rsiAnzeige(p.rsi)}</td>
@@ -623,6 +773,7 @@ function renderTable() {
           <span class="tip">${p.analyst_target_low && p.analyst_target_high ? formatEUR(p.analyst_target_low) + ' – ' + formatEUR(p.analyst_target_high) : (p.etf_implied && p.etf_implied.min_upside !== null ? (p.etf_implied.min_upside > 0 ? '+' : '') + p.etf_implied.min_upside.toFixed(0) + '% bis +' + p.etf_implied.max_upside.toFixed(0) + '% (Einzelwerte)' : (p.etf_implied && p.etf_implied.range_low ? '$' + p.etf_implied.range_low.toLocaleString() + ' – $' + p.etf_implied.range_high.toLocaleString() : '—'))}</span>
         </div>
       </td>
+      <td class="px-4 py-3 text-center">${thesisCell(p)}</td>
       <td class="px-4 py-3 text-center sparkline-cell">
         <canvas id="spark-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}" width="120" height="36"></canvas>
         <div class="spark-ath-marker">${p.sparkline_from_ath ? '↓ ATH: ' + p.ath_date : '3M'}</div>
@@ -684,7 +835,7 @@ function renderWatchlist() {
     const vsSmaClass = vsSma50 > 10 ? 'text-red-600' : vsSma50 > 0 ? 'text-green-600' : vsSma50 < -10 ? 'text-red-600' : vsSma50 < 0 ? 'text-yellow-600' : '';
     return `<tr class="border-t border-gray-700 hover:bg-gray-750">
       <td class="px-2 py-3" style="position:relative">
-        <span class="del-btn" title="Von der Watchlist entfernen" onclick="deletePosition('watchlist','${p.ticker}')">✕</span>
+        <span class="del-btn" title="${LANG === 'en' ? 'Remove from watchlist' : 'Von der Watchlist entfernen'}" onclick="deletePosition('watchlist','${p.ticker}')">✕</span>
         <div class="font-semibold truncate" style="max-width:120px">${p.short_name || p.name}</div>
         <div class="text-gray-500 text-xs">${p.ticker} ${isETF ? '📊' : '📈'}</div>
       </td>
@@ -692,31 +843,31 @@ function renderWatchlist() {
       <td class="px-2 py-3 text-right ${athClass}">
         <div class="tooltip">
           ${formatPct(p.ath_distance_pct)}
-          <span class="tip">ATH: ${p.ath ? formatEUR(p.ath) : '—'} (${p.ath_date || '—'})<br><br>Kaufregel Kurs vs. ATH:<br>✅ -50%+ vom ATH → Kaufen (wenn Unternehmen solide)<br>✅ -20–30% vom ATH → Kaufen (gesunder Rücksetzer)<br>⏸️ -10–20% vom ATH → Ok, aber Risiko höher<br>⏸️ -5–10% vom ATH → Warten (Korrektur kann tiefer gehen)<br>❌ Am ATH → Nicht kaufen (überhitzt)<br><br>Merksatz: Kaufe bei Rabatt vom ATH, nicht am Höchststand.</span>
+          <span class="tip">ATH: ${p.ath ? formatEUR(p.ath) : '—'} (${p.ath_date || '—'})<br><br>${RULE_TXT.ath(BR())}</span>
         </div>
       </td>
       <td class="px-2 py-3 text-right">
         <div class="tooltip">
-          ${p.kgv ? Math.round(p.kgv) : '—'}
-          <span class="tip">KGV Kaufregel:<br>✅ unter 15 → günstig (Value)<br>⏸️ 15–25 → fair bewertet<br>❌ über 25 → teuer (Wachstumserwartung)<br><br>⚠ Niedriges KGV ≠ Schnäppchen! Immer prüfen: Warum?<br>Tipp: KGV + Wachstum kombinieren (PEG-Ratio)</span>
+          <span class="${p.kgv ? (p.kgv < BR().kgv.cheap_below ? 'text-green-600' : p.kgv > BR().kgv.expensive_above ? 'text-red-600' : '') : ''}">${p.kgv ? Math.round(p.kgv) : '—'}</span>
+          <span class="tip">${RULE_TXT.kgv(BR())}</span>
         </div>
       </td>
       <td class="px-2 py-3 text-right">
         <div class="tooltip">
-          ${p.kvb ? Math.round(p.kvb) : '—'}
-          <span class="tip">KBV Kaufregel:<br>✅ unter 1,5 → günstig<br>⏸️ 1,5–3 → Vorsicht<br>❌ über 3 → nicht kaufen${p.kvb && p.kvb < 1.5 ? '<br><br>→ Günstiges KBV!' : p.kvb && p.kvb > 3 ? '<br><br>→ Teuer, nicht kaufen' : ''}<br><br>⚠ Niedriges KGV/KBV kann eine Value-Trap sein. Immer prüfen: Warum ist es so billig?</span>
+          <span class="${p.kvb ? (p.kvb < BR().kbv.cheap_below ? 'text-green-600' : p.kvb > BR().kbv.expensive_above ? 'text-red-600' : '') : ''}">${p.kvb ? Math.round(p.kvb) : '—'}</span>
+          <span class="tip">${RULE_TXT.kbv(BR())}</span>
         </div>
       </td>
       <td class="px-2 py-3 text-right">
         <div class="tooltip">
-          <span class="${p.rsi && p.rsi >= 70 ? 'text-red-600' : p.rsi && p.rsi <= 30 ? 'text-green-600' : ''}">${p.rsi ? Math.round(p.rsi) : '—'}</span>
-          <span class="tip">RSI Kaufregel (14 Tage):<br>✅ RSI unter 30 → überverkauft, starkes Kaufsignal<br>✅ RSI 30–40 → günstiges Niveau<br>⏸️ RSI 40–60 → neutral, warten<br>❌ RSI über 70 → überkauft, Korrektur möglich<br>⚠ RSI funktioniert nur in Seitwärtsmärkten!</span>
+          <span class="${p.rsi && p.rsi >= BR().rsi.avoid_above ? 'text-red-600' : p.rsi && p.rsi <= BR().rsi.buy_below ? 'text-green-600' : ''}">${p.rsi ? Math.round(p.rsi) : '—'}</span>
+          <span class="tip">${RULE_TXT.rsi(BR())}</span>
         </div>
       </td>
       <td class="px-2 py-3 text-right">
         <div class="tooltip">
           <span class="${vsSmaClass}">${vsSma50 ? formatPct(vsSma50) : '—'}</span>
-          <span class="tip">Kurs vs. SMA 50 (Abstand):<br>✅ unter -5% → unter SMA50, günstiger Einstieg<br>✅ -5 bis 0% → leicht unter, DCA-Zone<br>⏸️ 0 bis +5% → fair<br>❌ über +10% → überkauft, Korrektur möglich<br><br>Tipp: Warte auf Rücksetzer Richtung SMA50!</span>
+          <span class="tip">${RULE_TXT.sma50(BR())}</span>
         </div>
       </td>
       <td class="px-2 py-3 text-right">${smaAmpel(p)}</td>
@@ -732,6 +883,7 @@ function renderWatchlist() {
           <span class="tip">${p.analyst_target_low && p.analyst_target_high ? formatEUR(p.analyst_target_low) + ' – ' + formatEUR(p.analyst_target_high) : (p.etf_implied && p.etf_implied.range_low ? '$' + p.etf_implied.range_low.toLocaleString() + ' – $' + p.etf_implied.range_high.toLocaleString() : '—')}</span>
         </div>
       </td>
+      <td class="px-2 py-3 text-center">${thesisCell(p)}</td>
       <td class="px-2 py-3 text-center sparkline-cell">
         <canvas id="wspark-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}" width="120" height="36"></canvas>
         <div class="spark-popup">
@@ -845,7 +997,7 @@ function drawWatchlistSparklines() {
       bctx.fillStyle = '#e2e8f0'; bctx.font = 'bold 28px sans-serif';
       bctx.fillText(p.short_name || p.name, bpad, BH - 10);
       bctx.fillStyle = '#94a3b8'; bctx.font = '24px sans-serif';
-      bctx.fillText('Min: ' + Math.round(min) + '  Max: ' + Math.round(max) + '  Aktuell: ' + Math.round(last), bpad, BH - 35);
+      bctx.fillText('Min: ' + Math.round(min) + '  Max: ' + Math.round(max) + '  ' + t('Aktuell') + ': ' + Math.round(last), bpad, BH - 35);
     }
   });
 }
@@ -1043,7 +1195,7 @@ function drawWatchlistSparklines5y() {
       bctx.fillStyle = last >= first ? '#22c55e' : '#ef4444'; bctx.fill();
 
       bctx.fillStyle = '#e2e8f0'; bctx.font = 'bold 22px sans-serif';
-      bctx.fillText((p.short_name || p.name) + ' — 5 Jahre', bpad, BH - 10);
+      bctx.fillText((p.short_name || p.name) + (LANG === 'en' ? ' — 5 years' : ' — 5 Jahre'), bpad, BH - 10);
       bctx.fillStyle = '#94a3b8'; bctx.font = '16px sans-serif';
       bctx.fillText('SMA50: ' + (s50[s50.length-1] ? Math.round(s50[s50.length-1]) : '—') + ' | SMA200: ' + (s200[s200.length-1] ? Math.round(s200[s200.length-1]) : '—'), bpad, BH - 30);
     }
@@ -1248,7 +1400,7 @@ function updateSmaChart() {
       },
       scales: {
         x: { display: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', maxTicksLimit: 12 } },
-        y: { display: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', callback: v => '€' + v.toFixed(0) } }
+        y: { display: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', callback: v => SYM() + v.toFixed(0) } }
       }
     }
   });
@@ -1366,7 +1518,7 @@ function drawSparklines() {
       bctx.fillStyle = '#e2e8f0'; bctx.font = 'bold 28px sans-serif';
       bctx.fillText(p.short_name || p.name, bpad, BH - 10);
       bctx.fillStyle = '#94a3b8'; bctx.font = '24px sans-serif';
-      bctx.fillText('Min: ' + Math.round(min) + '  Max: ' + Math.round(max) + '  Aktuell: ' + Math.round(last), bpad, BH - 35);
+      bctx.fillText('Min: ' + Math.round(min) + '  Max: ' + Math.round(max) + '  ' + t('Aktuell') + ': ' + Math.round(last), bpad, BH - 35);
     }
   });
 }
@@ -1521,8 +1673,8 @@ function drawSparklines12m() {
 
       // Price labels
       bctx.fillStyle = '#94a3b8'; bctx.font = '20px sans-serif';
-      bctx.fillText('€' + max.toFixed(0), 2, pad + 10);
-      bctx.fillText('€' + min.toFixed(0), 2, BH - pad);
+      bctx.fillText(SYM() + max.toFixed(0), 2, pad + 10);
+      bctx.fillText(SYM() + min.toFixed(0), 2, BH - pad);
     }
   });
 }
@@ -1620,7 +1772,7 @@ function drawSparklines5y() {
       bctx.fillStyle = last >= first ? '#22c55e' : '#ef4444'; bctx.fill();
 
       bctx.fillStyle = '#e2e8f0'; bctx.font = 'bold 22px sans-serif';
-      bctx.fillText(p.short_name || p.name + ' — 5 Jahre', bpad, BH - 10);
+      bctx.fillText(p.short_name || p.name + (LANG === 'en' ? ' — 5 years' : ' — 5 Jahre'), bpad, BH - 10);
       bctx.fillStyle = '#94a3b8'; bctx.font = '16px sans-serif';
       bctx.fillText('SMA50: ' + (s50[s50.length-1] ? Math.round(s50[s50.length-1]) : '—') + ' | SMA200: ' + (s200[s200.length-1] ? Math.round(s200[s200.length-1]) : '—'), bpad, BH - 30);
     }
@@ -1652,7 +1804,7 @@ function renderAnalystCards() {
       const meanPos = ((mean - low) / range * 100);
       rangeHTML = `
         <div class="mt-3">
-          <div class="text-xs text-gray-400 mb-1">Analysten-Zielkorridor</div>
+          <div class="text-xs text-gray-400 mb-1">${t('Analysten-Zielkorridor')}</div>
           <div class="relative h-6 bg-gradient-to-r from-red-600 via-yellow-500 to-green-600 rounded-full">
             <div class="analyst-marker" style="left:${Math.max(0, Math.min(100, pos))}%"></div>
             <div class="absolute top-0 h-6 w-0.5 bg-white opacity-50" style="left:${meanPos}%"></div>
@@ -1663,7 +1815,7 @@ function renderAnalystCards() {
             <span>${formatEUR(high)}</span>
           </div>
           <div class="text-center text-xs mt-1">
-            <span class="text-gray-400">Aktuell: ${formatEUR(p.current_price)}</span>
+            <span class="text-gray-400">${t('Aktuell')}: ${formatEUR(p.current_price)}</span>
             ${upside !== null ? `<span class="${upside >= 0 ? 'gain' : 'loss'} ml-2">(${formatPct(upside)})</span>` : ''}
           </div>
         </div>
@@ -1675,11 +1827,11 @@ function renderAnalystCards() {
     if (p.analyst_target_low && p.analyst_target_high && p.analyst_target_mean) {
       const spread = ((p.analyst_target_high - p.analyst_target_low) / p.analyst_target_mean * 100).toFixed(0);
       const spreadClass = spread > 80 ? 'loss' : spread > 40 ? 'text-yellow-400' : 'gain';
-      spreadHTML = `<span class="${spreadClass} text-xs ml-2">Streuung: ±${(spread/2).toFixed(0)}% (${formatEUR(p.analyst_target_low)} – ${formatEUR(p.analyst_target_high)})</span>`;
+      spreadHTML = `<span class="${spreadClass} text-xs ml-2">${t('Streuung')}: ±${(spread/2).toFixed(0)}% (${formatEUR(p.analyst_target_low)} – ${formatEUR(p.analyst_target_high)})</span>`;
     } else if (p.etf_implied && p.etf_implied.range_low && p.etf_implied.range_high) {
       const mid = (p.etf_implied.range_low + p.etf_implied.range_high) / 2;
       const spread = ((p.etf_implied.range_high - p.etf_implied.range_low) / mid * 100).toFixed(0);
-      spreadHTML = `<span class="text-yellow-400 text-xs ml-2">Streuung: ±${(spread/2).toFixed(0)}% ($${p.etf_implied.range_low.toLocaleString()} – $${p.etf_implied.range_high.toLocaleString()})</span>`;
+      spreadHTML = `<span class="text-yellow-400 text-xs ml-2">${t('Streuung')}: ±${(spread/2).toFixed(0)}% ($${p.etf_implied.range_low.toLocaleString()} – $${p.etf_implied.range_high.toLocaleString()})</span>`;
     }
 
     return `
@@ -1692,23 +1844,23 @@ function renderAnalystCards() {
           <span class="${rec.cls} text-sm">${rec.emoji} ${rec.text}</span>
         </div>
         <div class="grid grid-cols-2 gap-3 text-sm mb-3">
-          <div><span class="text-gray-400">Aktuell:</span> <span class="font-semibold">${formatEUR(p.price_eur)}</span></div>
+          <div><span class="text-gray-400">${t('Aktuell')}:</span> <span class="font-semibold">${formatEUR(p.price_eur)}</span></div>
           <div><span class="text-gray-400">ATH:</span> <span class="font-semibold">${p.ath ? formatEUR(p.ath) : '—'}</span></div>
           <div><span class="text-gray-400">vs. ATH:</span> <span class="${p.ath_distance_pct < -30 ? 'loss' : 'gain'}">${formatPct(p.ath_distance_pct)}</span></div>
-          <div><span class="text-gray-400">${p.etf_implied ? 'Holdings analysiert' : 'Analysten'}:</span> <span class="font-semibold">${p.etf_implied ? p.etf_implied.holdings_analyzed : (p.analyst_count || '—')}</span></div>
+          <div><span class="text-gray-400">${p.etf_implied ? t('Holdings analysiert') : t('Analysten')}:</span> <span class="font-semibold">${p.etf_implied ? p.etf_implied.holdings_analyzed : (p.analyst_count || '—')}</span></div>
         </div>
         <div class="bg-gray-700 rounded-lg p-3 text-sm">
-          <div class="font-semibold mb-1">🎯 ${p.etf_implied ? 'Impliziertes Kursziel (aus Top-Holdings)' : 'Kursziel (Median)'} ${spreadHTML}</div>
+          <div class="font-semibold mb-1">🎯 ${p.etf_implied ? t('Impliziertes Kursziel (aus Top-Holdings)') : t('Kursziel (Median)')} ${spreadHTML}</div>
           ${p.etf_implied ? '<div class="text-xs text-blue-400 mb-2">📊 ' + p.etf_implied.source + '</div>' : ''}
           <div class="grid grid-cols-3 gap-2 text-center">
             <div><div class="text-gray-400 text-xs">Min</div><div>${p.analyst_target_low ? formatEUR(p.analyst_target_low) : '—'}</div></div>
-            <div><div class="text-gray-400 text-xs">Mittel</div><div class="font-bold text-blue-400">${p.analyst_target_mean ? formatEUR(p.analyst_target_mean) : '—'}</div></div>
+            <div><div class="text-gray-400 text-xs">${t('Mittel')}</div><div class="font-bold text-blue-400">${p.analyst_target_mean ? formatEUR(p.analyst_target_mean) : '—'}</div></div>
             <div><div class="text-gray-400 text-xs">Max</div><div>${p.analyst_target_high ? formatEUR(p.analyst_target_high) : '—'}</div></div>
           </div>
           ${rangeHTML}
         </div>
         <div class="mt-3">
-          <div class="text-xs text-gray-400 mb-1">📈 Kursverlauf 12 Monate</div>
+          <div class="text-xs text-gray-400 mb-1">${t('📈 Kursverlauf 12 Monate')}</div>
           <canvas id="chart12m-${p.ticker.replace(/[^a-zA-Z0-9]/g,'_')}" style="height:80px"></canvas>
         </div>
       </div>
@@ -1815,19 +1967,19 @@ function renderRebalance() {
     const diff = curPct - target;
     const diffVal = diff / 100 * total;
     const color = Math.abs(diff) < 3 ? 'text-gray-400' : diff > 0 ? 'loss' : 'gain';
-    const arrow = diff > 0 ? '↓ Verkaufen' : diff < 0 ? '↑ Kaufen' : '✓ OK';
+    const arrow = diff > 0 ? t('↓ Verkaufen') : diff < 0 ? t('↑ Kaufen') : '✓ OK';
 
     html += `
       <div class="bg-gray-700 rounded-lg p-4">
         <div class="flex justify-between items-center mb-2">
-          <span class="font-semibold">${cat}</span>
+          <span class="font-semibold">${t(cat)}</span>
           <span class="text-sm ${color}">${arrow} ${Math.abs(diff) > 3 ? formatEUR(Math.abs(diffVal)) : ''}</span>
         </div>
         <div class="flex items-center gap-4">
           <div class="flex-1">
             <div class="h-4 bg-gray-600 rounded-full relative">
               <div class="h-4 bg-blue-500 rounded-full" style="width:${Math.min(curPct, 100)}%"></div>
-              <div class="absolute top-0 h-4 w-0.5 bg-yellow-400" style="left:${target}%" title="Ziel: ${target}%"></div>
+              <div class="absolute top-0 h-4 w-0.5 bg-yellow-400" style="left:${target}%" title="${t('Ziel')}: ${target}%"></div>
             </div>
           </div>
           <div class="text-sm w-32 text-right">
@@ -1835,18 +1987,29 @@ function renderRebalance() {
             <span class="text-gray-400"> / ${target}%</span>
           </div>
         </div>
-        <div class="text-xs text-gray-400 mt-1">Aktuell: ${formatEUR(curVal)} · Ziel: ${formatEUR(target / 100 * total)}</div>
+        <div class="text-xs text-gray-400 mt-1">${t('Aktuell')}: ${formatEUR(curVal)} · ${t('Ziel')}: ${formatEUR(target / 100 * total)}</div>
       </div>
     `;
   });
   html += '</div>';
 
   // Summary
-  html += `
+  const nvdaPct = (portfolioData.find(p=>p.name.includes('NVIDIA'))?.pct_of_portfolio || 0).toFixed(0);
+  html += LANG === 'en' ? `
+    <div class="mt-6 bg-gray-700 rounded-lg p-4">
+      <h3 class="font-bold mb-2">📊 Summary</h3>
+      <ul class="text-sm space-y-1 text-gray-300">
+        <li>• <strong>NVIDIA</strong> is massively overweight at ${nvdaPct}% — reduce towards 15-20%</li>
+        <li>• <strong>Big tech</strong> dominates at ~70% — increase ETF diversification</li>
+        <li>• <strong>Bonds/defensive</strong> entirely missing — 10% recommended</li>
+        <li>• <strong>Emerging markets</strong> only ~0.6% — build up to 5%</li>
+      </ul>
+    </div>
+  ` : `
     <div class="mt-6 bg-gray-700 rounded-lg p-4">
       <h3 class="font-bold mb-2">📊 Zusammenfassung</h3>
       <ul class="text-sm space-y-1 text-gray-300">
-        <li>• <strong>NVIDIA</strong> ist mit ${(portfolioData.find(p=>p.name.includes('NVIDIA'))?.pct_of_portfolio || 0).toFixed(0)}% massiv übergewichtet — auf 15-20% reduzieren</li>
+        <li>• <strong>NVIDIA</strong> ist mit ${nvdaPct}% massiv übergewichtet — auf 15-20% reduzieren</li>
         <li>• <strong>Big Tech</strong> dominiert mit ~70% — Diversifikation in ETFs erhöhen</li>
         <li>• <strong>Anleihen/Defensiv</strong> fehlen komplett — 10% empfohlen</li>
         <li>• <strong>EM/Schwellenländer</strong> nur ~0.6% — auf 5% aufstocken</li>
