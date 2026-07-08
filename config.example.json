@@ -1,4 +1,14 @@
 {
+  "base_currency": "EUR",
+  "language": "de",
+  "buy_rules": {
+    "rsi":      {"buy_below": 30, "avoid_above": 70},
+    "kgv":      {"cheap_below": 15, "expensive_above": 25},
+    "kbv":      {"cheap_below": 1.5, "expensive_above": 3},
+    "vs_sma50": {"ideal_band": 2, "stretched_above": 8},
+    "ath":      {"strong_buy_below": -50, "buy_band": [-30, -20]}
+  },
+
   "portfolio": [
     {"name": "Apple",                   "ticker": "AAPL",    "shares": 10,   "currency": "USD"},
     {"name": "Microsoft",               "ticker": "MSFT",    "shares": 5,    "currency": "USD"},
