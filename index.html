@@ -156,6 +156,14 @@
 <!-- Main Content -->
 <div id="main" class="max-w-7xl mx-auto px-2 md:px-6 py-4 md:py-6 hidden">
 
+  <div id="demo-banner" class="hidden bg-blue-900/40 border border-blue-700 rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+    <div class="text-sm text-blue-100" data-i18n>Das sind Beispieldaten. Starte mit deinem eigenen Depot — dauert eine Minute.</div>
+    <div class="flex gap-2">
+      <button onclick="startOwnPortfolio()" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-semibold whitespace-nowrap" data-i18n>Eigenes Depot starten</button>
+      <button onclick="dismissDemoBanner()" class="px-2 py-1.5 rounded text-blue-300 hover:text-white text-sm" title="Ausblenden">✕</button>
+    </div>
+  </div>
+
   <!-- Tabs -->
   <div class="flex flex-wrap gap-1 md:gap-2 mb-4 md:mb-6">
     <div class="tab active" onclick="showTab('table')" data-i18n>📋 Tabelle</div>
@@ -166,7 +174,8 @@
 
   <!-- Tab: Tabelle -->
   <div id="tab-table">
-    <div class="flex justify-end mb-2">
+    <div class="flex justify-end gap-2 mb-2">
+      <button onclick="openImportDialog()" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm font-semibold" data-i18n>📋 Depot importieren</button>
       <button onclick="toggleAddForm()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-sm font-semibold">＋ Position</button>
     </div>
     <div id="add-form" class="hidden bg-gray-800 rounded-xl p-4 mb-3">
@@ -284,6 +293,26 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="analyst-cards"></div>
   </div>
 
+
+  <!-- Bulk-Import Modal -->
+  <div id="import-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-xl p-5 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold" data-i18n>📋 Depot importieren</h3>
+        <button onclick="closeImportDialog()" class="text-gray-400 hover:text-white text-xl leading-none">✕</button>
+      </div>
+      <p class="text-sm text-gray-400 mb-3" data-i18n>Eine Position pro Zeile. Ticker, Stück, optional Einstand — oder ein CSV-Export deines Brokers mit Kopfzeile.</p>
+      <div class="text-xs text-gray-500 mb-2 font-mono leading-relaxed" data-i18n>NVDA 10 @145.20&#10;SAP.DE; 15; 120,50&#10;MSFT 5</div>
+      <textarea id="import-text" rows="8" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm font-mono" placeholder="AAPL 10 @145.20"></textarea>
+      <div class="flex gap-2 mt-3">
+        <button onclick="previewImport()" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-semibold" data-i18n>Vorschau</button>
+        <button onclick="closeImportDialog()" class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-sm" data-i18n>Abbrechen</button>
+      </div>
+      <div id="import-status" class="text-xs text-gray-400 mt-2"></div>
+      <div id="import-preview" class="mt-3"></div>
+    </div>
+  </div>
+
   <!-- Tab: Rebalancing -->
   <div id="tab-rebalance" class="hidden">
     <div class="bg-gray-800 rounded-xl p-3 md:p-6">
@@ -345,6 +374,20 @@ const L_EN = {
   'Ungültiger Wert': 'Invalid value',
   'nur mit Stück · Durchschnittskurs je Aktie in €': 'portfolio only · avg price per share',
   'Kauf-Watch': 'Buy watch', 'Warten': 'Wait', 'Zu heiß': 'Too hot', 'Bedingt': 'Conditional', 'Verkauf-Watch': 'Sell watch',
+  'Das sind Beispieldaten. Starte mit deinem eigenen Depot — dauert eine Minute.':
+    'This is sample data. Start with your own portfolio — takes a minute.',
+  'Eigenes Depot starten': 'Start your own portfolio',
+  '📋 Depot importieren': '📋 Import portfolio',
+  'Eine Position pro Zeile. Ticker, Stück, optional Einstand — oder ein CSV-Export deines Brokers mit Kopfzeile.':
+    'One position per line: ticker, shares, optional cost basis — or a broker CSV export with a header row.',
+  'Vorschau': 'Preview', 'Abbrechen': 'Cancel',
+  'Bitte Text eingeben.': 'Please enter some text.',
+  'Prüfe Positionen bei Yahoo...': 'Validating positions with Yahoo...',
+  'Keine gültigen Positionen erkannt.': 'No valid positions recognized.',
+  'gefunden': 'found', 'unbekannt': 'unknown', 'bereits im Depot': 'already in portfolio',
+  'Importieren': 'Import', 'wird importiert...': 'importing...',
+  'importiert': 'imported', 'übersprungen': 'skipped',
+  'Stück ändern': 'Edit shares', 'Stück je Position (leer = löschen)': 'Shares (empty = remove)',
   'Agent': 'Agent', 'These älter als 30 Tage': 'thesis older than 30 days',
   'Analysten-Zielkorridor': 'Analyst target corridor', 'Aktuell': 'Current', 'Mittel': 'Mean',
   'Analysten': 'Analysts', 'Holdings analysiert': 'holdings analyzed',
@@ -534,6 +577,7 @@ async function loadPortfolio() {
 
     renderTable();
     renderWatchlist();
+    checkDemoBanner();
     drawSparklines();
     drawSparklines12m();
     drawSparklines5y();
@@ -588,6 +632,136 @@ async function submitAdd() {
   } catch (e) {
     status.textContent = '❌ ' + e.message;
   }
+}
+
+// ─── Demo-Erkennung ───
+const DEMO_TICKERS = new Set(['AAPL', 'MSFT', 'NVDA', 'SAP.DE', 'IWDA.AS', 'BTC-USD']);
+
+function looksLikeDemo(portfolio) {
+  if (!portfolio || portfolio.length === 0) return false;
+  const tickers = portfolio.map(p => p.ticker);
+  return tickers.length <= DEMO_TICKERS.size + 1 &&
+         tickers.every(t => DEMO_TICKERS.has(t));
+}
+
+function checkDemoBanner() {
+  const banner = document.getElementById('demo-banner');
+  if (sessionStorage.getItem('demoBannerDismissed')) { banner.classList.add('hidden'); return; }
+  banner.classList.toggle('hidden', !looksLikeDemo(portfolioData));
+}
+
+function dismissDemoBanner() {
+  sessionStorage.setItem('demoBannerDismissed', '1');
+  document.getElementById('demo-banner').classList.add('hidden');
+}
+
+async function startOwnPortfolio() {
+  const msg = LANG === 'en'
+    ? 'Remove all demo positions and start fresh? This only clears the demo tickers, nothing you have added yourself.'
+    : 'Alle Demo-Positionen entfernen und neu starten? Löscht nur die Demo-Ticker, nichts Eigenes.';
+  if (!confirm(msg)) return;
+  for (const p of portfolioData) {
+    if (DEMO_TICKERS.has(p.ticker)) {
+      await fetch(`/api/positions/portfolio/${encodeURIComponent(p.ticker)}`, { method: 'DELETE' });
+    }
+  }
+  dismissDemoBanner();
+  openImportDialog();
+  await loadPortfolio();
+}
+
+// ─── Bulk-Import ───
+function openImportDialog() {
+  document.getElementById('import-modal').classList.remove('hidden');
+  document.getElementById('import-status').textContent = '';
+  document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-text').focus();
+}
+
+function closeImportDialog() {
+  document.getElementById('import-modal').classList.add('hidden');
+}
+
+let _importPreviewItems = [];
+
+async function previewImport() {
+  const status = document.getElementById('import-status');
+  const preview = document.getElementById('import-preview');
+  const text = document.getElementById('import-text').value;
+  if (!text.trim()) { status.textContent = t('Bitte Text eingeben.'); return; }
+  status.textContent = t('Prüfe Positionen bei Yahoo...');
+  preview.innerHTML = '';
+  try {
+    const resp = await fetch('/api/positions/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines: text, dry_run: true })
+    });
+    const items = await resp.json();
+    if (!resp.ok) { status.textContent = '❌ ' + (items.detail || resp.status); return; }
+    if (!items.length) { status.textContent = t('Keine gültigen Positionen erkannt.'); return; }
+    _importPreviewItems = items;
+    const okCount = items.filter(i => i.status === 'ok').length;
+    status.textContent = `${okCount} ${t('gefunden')}${items.length > okCount ? `, ${items.length - okCount} ${LANG === 'en' ? 'skipped' : 'übersprungen'}` : ''}`;
+    const statusLabel = s => s === 'ok' ? '✅' : s === 'duplicate' ? `⏭ ${t('bereits im Depot')}` : `❌ ${t('unbekannt')}`;
+    preview.innerHTML = `
+      <div class="bg-gray-900 rounded-lg overflow-hidden mb-3">
+        <table class="w-full text-xs">
+          <thead><tr class="text-gray-400 text-left"><th class="px-2 py-1">Ticker</th><th class="px-2 py-1">${t('Position')}</th><th class="px-2 py-1 text-right">${t('Stück (leer = Watchlist)').split(' ')[0]}</th><th class="px-2 py-1 text-right">${t('Einstand')}</th><th class="px-2 py-1"></th></tr></thead>
+          <tbody>
+            ${items.map(i => `<tr class="border-t border-gray-800">
+              <td class="px-2 py-1 font-mono">${i.ticker}</td>
+              <td class="px-2 py-1">${i.name || '—'}</td>
+              <td class="px-2 py-1 text-right">${i.shares ?? '—'}</td>
+              <td class="px-2 py-1 text-right">${i.buy_price ? formatEUR(i.buy_price, 2) : '—'}</td>
+              <td class="px-2 py-1">${statusLabel(i.status)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${okCount > 0 ? `<button onclick="confirmImport()" class="px-3 py-1.5 rounded bg-green-600 hover:bg-green-500 text-sm font-semibold">${t('Importieren')} (${okCount})</button>` : ''}
+    `;
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+async function confirmImport() {
+  const status = document.getElementById('import-status');
+  status.textContent = t('wird importiert...');
+  try {
+    const resp = await fetch('/api/positions/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: _importPreviewItems.filter(i => i.status === 'ok'), dry_run: false })
+    });
+    const d = await resp.json();
+    if (!resp.ok) { status.textContent = '❌ ' + (d.detail || resp.status); return; }
+    status.textContent = `✅ ${d.added.length} ${t('importiert')}${d.skipped.length ? `, ${d.skipped.length} ${t('übersprungen')}` : ''}. ${t('Lade neu — Verlauf/Signale können beim ersten Mal 1–2 Min. brauchen.')}`;
+    document.getElementById('import-preview').innerHTML = '';
+    document.getElementById('import-text').value = '';
+    dismissDemoBanner();
+    setTimeout(() => { closeImportDialog(); loadPortfolio(); }, 1200);
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+// ─── Stück klickbar ändern (analog editBuyPrice) ───
+async function editShares(ticker, current) {
+  const msg = t('Stück je Position (leer = löschen)');
+  const raw = prompt(`${ticker} — ${msg}`, current || '');
+  if (raw === null) return;
+  const val = raw.trim() === '' ? null : parseFloat(raw.replace(',', '.'));
+  if (raw.trim() !== '' && (!isFinite(val) || val <= 0)) { alert(t('Ungültiger Wert')); return; }
+  if (val === null) { await deletePosition('portfolio', ticker); return; }
+  const resp = await fetch(`/api/positions/portfolio/${encodeURIComponent(ticker)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shares: val })
+  });
+  if (resp.ok) loadPortfolio();
+  else alert('Fehler: ' + ((await resp.json()).detail || resp.status));
 }
 
 async function deletePosition(list, ticker) {
@@ -773,7 +947,7 @@ function renderTable() {
       <td class="px-2 py-3" style="max-width:120px;overflow:hidden;position:relative">
         <span class="del-btn" title="${LANG === 'en' ? 'Remove from portfolio' : 'Aus dem Depot entfernen'}" onclick="deletePosition('portfolio','${p.ticker}')">✕</span>
         <div class="font-semibold truncate">${p.short_name || p.name}</div>
-        <div class="text-gray-500 text-xs">${p.shares.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE', {maximumFractionDigits: p.shares < 10 ? 4 : 0})}x · ${p.ticker} ${isETF ? '📊' : p.ticker.startsWith('BTC') ? '₿' : '📈'}</div>
+        <div class="text-gray-500 text-xs"><span class="tooltip" onclick="editShares('${p.ticker}', ${p.shares})" style="cursor:pointer" title="${t('Stück ändern')}">${p.shares.toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE', {maximumFractionDigits: p.shares < 10 ? 4 : 0})}x</span> · ${p.ticker} ${isETF ? '📊' : p.ticker.startsWith('BTC') ? '₿' : '📈'}</div>
       </td>
       <td class="px-4 py-3 text-right">${p.price_eur ? Math.round(p.price_eur).toLocaleString(LANG === 'en' ? 'en-US' : 'de-DE') : '—'}</td>
       <td class="px-4 py-3 text-right font-semibold">${formatK(p.value_eur)}</td>
