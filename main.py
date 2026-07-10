@@ -5,6 +5,7 @@ API schema is unchanged from the original tracker, so index.html works as-is.
 """
 
 import os
+import re
 import threading
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -418,15 +419,247 @@ def add_position(body: NewPosition):
             "name": name, "currency": currency}
 
 
-class BuyPriceIn(BaseModel):
-    buy_price: float | None = None  # None or 0 clears the cost basis
+class PatchPositionIn(BaseModel):
+    shares: float | None = None  # None = don't change
+    buy_price: float | None = None  # None = don't change; 0 = clear
 
 
 @app.patch("/api/positions/portfolio/{ticker}")
-def set_buy_price(ticker: str, body: BuyPriceIn):
-    if not md.set_buy_price(ticker, body.buy_price):
+def patch_position(ticker: str, body: PatchPositionIn):
+    if body.shares is None and body.buy_price is None:
+        raise HTTPException(400, "Mindestens 'shares' oder 'buy_price' angeben")
+    if not md.set_position(ticker, shares=body.shares, buy_price=body.buy_price):
         raise HTTPException(404, f"'{ticker}' nicht im Depot")
-    return {"ok": True, "ticker": ticker, "buy_price": body.buy_price}
+    return {"ok": True, "ticker": ticker, "shares": body.shares, "buy_price": body.buy_price}
+
+
+class BulkItem(BaseModel):
+    ticker: str
+    shares: float | None = None
+    buy_price: float | None = None
+    name: str | None = None
+
+
+class BulkImportIn(BaseModel):
+    lines: str | None = None
+    items: list[BulkItem] | None = None
+    dry_run: bool = False
+
+
+def _normalize_decimal(val: str) -> str:
+    """Normalize German decimal comma (1.234,56 -> 1234.56)."""
+    return val.replace(".", "").replace(",", ".")
+
+
+def _parse_number(raw: str | None) -> float | None:
+    if raw is None:
+        return None
+    raw = raw.strip().replace("€", "").replace("$", "").replace("£", "").replace(" ", "")
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        try:
+            return float(_normalize_decimal(raw))
+        except ValueError:
+            return None
+
+
+def _parse_line(line: str) -> BulkItem | None:
+    """Parse a single line into a BulkItem. Supports multiple formats."""
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return None
+
+    # Format: "NVDA 10 @145.20" or "NVDA 10 145.20"
+    m = re.match(r'^(\S+)\s+([\d.,]+)(?:\s*@\s*([\d.,]+))?\s*$', line)
+    if m:
+        ticker = m.group(1).strip().upper()
+        shares = _parse_number(m.group(2))
+        buy_price = _parse_number(m.group(3))
+        if shares is not None and shares > 0:
+            return BulkItem(ticker=ticker, shares=shares, buy_price=buy_price)
+
+    # Format: "SAP.DE; 15; 120,50" (semicolon separated)
+    parts = [p.strip() for p in line.split(";")]
+    if len(parts) >= 2:
+        ticker = parts[0].upper()
+        shares = _parse_number(parts[1])
+        buy_price = _parse_number(parts[2]) if len(parts) >= 3 else None
+        if shares is not None and shares > 0:
+            return BulkItem(ticker=ticker, shares=shares, buy_price=buy_price)
+
+    # Format: "NVDA 10" (ticker + shares only)
+    m = re.match(r'^(\S+)\s+([\d.,]+)\s*$', line)
+    if m:
+        ticker = m.group(1).strip().upper()
+        shares = _parse_number(m.group(2))
+        if shares is not None and shares > 0:
+            return BulkItem(ticker=ticker, shares=shares)
+
+    return None
+
+
+def _detect_csv_delimiter(header: str) -> str:
+    """Semicolons are more common in German CSV, but detect by trying both."""
+    sc = header.count(";")
+    cc = header.count(",")
+    return ";" if sc >= cc else ","
+
+
+CSV_TICKER_KEYS = {"ticker", "symbol", "isin"}
+CSV_SHARES_KEYS = {"shares", "stück", "stueck", "anzahl", "menge"}
+CSV_PRICE_KEYS = {"price", "preis", "einstand", "kaufkurs", "buy", "cost"}
+CSV_NAME_KEYS = {"name", "bezeichnung", "description"}
+
+
+def _parse_csv(lines: list[str]) -> list[BulkItem]:
+    """Parse CSV block with header detection and flexible column mapping."""
+    if len(lines) < 2:
+        return []
+    delim = _detect_csv_delimiter(lines[0])
+    header = [h.strip().lower().strip('"').strip("'") for h in lines[0].split(delim)]
+    col_ticker, col_shares, col_price, col_name = None, None, None, None
+    for i, h in enumerate(header):
+        if h in CSV_TICKER_KEYS and col_ticker is None:
+            col_ticker = i
+        elif h in CSV_SHARES_KEYS and col_shares is None:
+            col_shares = i
+        elif h in CSV_PRICE_KEYS and col_price is None:
+            col_price = i
+        elif h in CSV_NAME_KEYS and col_name is None:
+            col_name = i
+    if col_ticker is None:
+        return []  # No recognizable header
+
+    results = []
+    for line in lines[1:]:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split(delim)]
+        if len(parts) <= col_ticker:
+            continue
+        ticker = parts[col_ticker].upper().strip()
+        if not ticker:
+            continue
+        shares = _parse_number(parts[col_shares]) if col_shares is not None and len(parts) > col_shares else None
+        buy_price = _parse_number(parts[col_price]) if col_price is not None and len(parts) > col_price else None
+        name = parts[col_name].strip() if col_name is not None and len(parts) > col_name and parts[col_name].strip() else None
+        if shares is not None and shares > 0:
+            results.append(BulkItem(ticker=ticker, shares=shares, buy_price=buy_price, name=name))
+    return results
+
+
+def _parse_lines(lines: str) -> list[BulkItem]:
+    """Parse a multi-line string into BulkItem entries."""
+    raw = [l for l in lines.split("\n") if l.strip() and not l.strip().startswith("#")]
+    if not raw:
+        return []
+
+    # CSV detection: look for known header keywords in the first non-comment line
+    first = raw[0].lower().strip()
+    if any(kw in first for kw in ("ticker", "symbol", "stück", "shares", "einstand", "kaufkurs")):
+        csv_items = _parse_csv(raw)
+        if csv_items:
+            return csv_items
+
+    # Each line individually
+    items = []
+    for line in raw:
+        item = _parse_line(line)
+        if item:
+            items.append(item)
+    return items
+
+
+def _validate_bulk_items(items: list[BulkItem], dry_run: bool) -> JSONResponse:
+    """Validate each item via fetch_info and return preview or persist."""
+    known_tickers = {p["ticker"] for p in md.PORTFOLIO}
+
+    results = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        def validate(item: BulkItem) -> dict:
+            info = md.fetch_info(item.ticker, retries=1)
+            price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose")
+            if not price:
+                return {"ticker": item.ticker, "status": "not_found"}
+            if item.ticker in known_tickers:
+                return {"ticker": item.ticker, "status": "duplicate"}
+            return {
+                "ticker": item.ticker,
+                "name": info.get("shortName", item.ticker),
+                "shares": item.shares,
+                "buy_price": item.buy_price,
+                "currency": info.get("currency", "USD"),
+                "status": "ok",
+            }
+
+        futs = {ex.submit(validate, item): item for item in items}
+        for f in as_completed(futs):
+            results.append(f.result())
+
+    # Stable order: match input sequence
+    ticker_order = {item.ticker: i for i, item in enumerate(items)}
+    results.sort(key=lambda r: ticker_order.get(r["ticker"], 999))
+
+    if dry_run:
+        return JSONResponse(results)
+
+    ok_items = [r for r in results if r["status"] == "ok"]
+    skipped_items = [r for r in results if r["status"] != "ok"]
+
+    if not ok_items:
+        return JSONResponse({"added": [], "skipped": skipped_items})
+
+    entries = []
+    for r in ok_items:
+        entry = {
+            "ticker": r["ticker"],
+            "name": r["name"],
+            "shares": r["shares"],
+            "currency": r["currency"],
+        }
+        if r.get("buy_price"):
+            entry["buy_price"] = r["buy_price"]
+        entries.append(entry)
+
+    added_tickers, skipped_dupes = md.add_positions_batch(entries)
+
+    # Warm cache in background
+    def _warm():
+        for r in ok_items:
+            try:
+                md.refresh_history([r["ticker"]], force=True)
+                md.get_stock_data(r["ticker"], r["currency"])
+            except Exception:
+                pass
+    threading.Thread(target=_warm, daemon=True).start()
+
+    return JSONResponse({
+        "added": [r for r in ok_items if r["ticker"] in added_tickers],
+        "skipped": skipped_items + [r for r in ok_items if r["ticker"] in skipped_dupes],
+    })
+
+
+@app.post("/api/positions/bulk")
+def bulk_import(body: BulkImportIn):
+    """Bulk-import positions from lines (multi-line string) or items (JSON array)."""
+    if body.lines is not None and body.items is not None:
+        raise HTTPException(400, "Nur 'lines' ODER 'items' angeben, nicht beide")
+    if body.lines is None and body.items is None:
+        raise HTTPException(400, "'lines' oder 'items' erforderlich")
+
+    if body.lines is not None:
+        items = _parse_lines(body.lines)
+    else:
+        items = body.items or []
+
+    if not items:
+        raise HTTPException(400, "Keine gültigen Positionen gefunden")
+
+    return _validate_bulk_items(items, dry_run=body.dry_run)
 
 
 @app.delete("/api/positions/{list_name}/{ticker}")

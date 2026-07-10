@@ -117,16 +117,41 @@ def add_position(list_name, entry):
 
 def set_buy_price(ticker, buy_price):
     """Set or clear the avg cost per share (base currency) on a portfolio position."""
+    return set_position(ticker, buy_price=buy_price)
+
+
+def set_position(ticker, shares=None, buy_price=None):
+    """Update shares and/or buy_price on a portfolio position atomically.
+    Returns True if found and changed, False if ticker not found."""
     with _config_lock:
         for pos in CONFIG["portfolio"]:
             if pos["ticker"] == ticker:
-                if buy_price and buy_price > 0:
+                if shares is not None:
+                    pos["shares"] = shares
+                if buy_price is not None and buy_price > 0:
                     pos["buy_price"] = buy_price
-                else:
+                elif buy_price is not None:
                     pos.pop("buy_price", None)
                 _save_config()
                 return True
     return False
+
+
+def add_positions_batch(entries):
+    """Atomically add multiple portfolio entries. Skips duplicates.
+    Returns (added_tickers, skipped_tickers)."""
+    added, skipped = [], []
+    with _config_lock:
+        lst = CONFIG["portfolio"]
+        for entry in entries:
+            if any(x["ticker"] == entry["ticker"] for x in lst):
+                skipped.append(entry["ticker"])
+            else:
+                lst.append(entry)
+                added.append(entry["ticker"])
+        if added:
+            _save_config()
+    return added, skipped
 
 
 def remove_position(list_name, ticker):
