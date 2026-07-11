@@ -4,6 +4,7 @@ Positions live in config.json; market data logic in marketdata.py.
 API schema is unchanged from the original tracker, so index.html works as-is.
 """
 
+import hmac
 import os
 import re
 import threading
@@ -12,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 import yfinance as yf
@@ -21,6 +23,35 @@ import marketdata as md
 from marketdata import PORTFOLIO, WATCHLIST, convert_to_base, sanitize
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_basic_auth = HTTPBasic(auto_error=False)
+
+
+def _auth_enabled():
+    return os.environ.get("CONVICTION_AUTH_ENABLED", "").lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def _require_basic_auth(credentials: HTTPBasicCredentials = Depends(_basic_auth)):
+    """Require configured credentials when app-wide authentication is enabled."""
+    if not _auth_enabled():
+        return
+
+    expected_username = os.environ.get("CONVICTION_AUTH_USERNAME")
+    expected_password = os.environ.get("CONVICTION_AUTH_PASSWORD")
+    is_valid = (
+        credentials is not None
+        and bool(expected_username)
+        and bool(expected_password)
+        and hmac.compare_digest(credentials.username, expected_username)
+        and hmac.compare_digest(credentials.password, expected_password)
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
 
 @asynccontextmanager
@@ -41,7 +72,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(_require_basic_auth)])
 md.init_db()
 
 
@@ -758,5 +789,5 @@ def serve_frontend():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app,
-                host=os.environ.get("HOST", "0.0.0.0"),
+                host=os.environ.get("HOST", "127.0.0.1"),
                 port=int(os.environ.get("PORT", "8080")))
