@@ -109,12 +109,36 @@ WantedBy=multi-user.target
 
 Create a LaunchAgent that runs a small runner script. **Note:** put the runner
 script *outside* `~/Documents` (e.g. `~/.local/bin/`), otherwise macOS TCC blocks
-launchd from reading it.
+launchd from reading it. Keep any public-deployment environment file outside the
+repository too. For example:
+
+```bash
+mkdir -p ~/.config/conviction
+chmod 700 ~/.config/conviction
+cp .env.public.example ~/.config/conviction/public.env
+chmod 600 ~/.config/conviction/public.env
+```
+
+Replace the password placeholder in that private file, then have the runner script
+load it before starting Conviction (for example, with `set -a; .
+~/.config/conviction/public.env; set +a`). Do not put credentials in the
+LaunchAgent plist, shell history, or this repository.
 
 ### Remote access
 
-The app has **no authentication** — don't expose it to the internet. Use it on
-your LAN, or via [Tailscale](https://tailscale.com)/WireGuard from your phone.
+Private access is the default: use Conviction locally, on a private LAN, or through
+[Tailscale](https://tailscale.com)/WireGuard. For public access, place it only
+behind a TLS-terminating reverse proxy or a Cloudflare Tunnel. Keep Conviction
+bound to localhost (`HOST=127.0.0.1`) so it is reachable only by that proxy/tunnel,
+not directly from the network.
+
+For an authenticated public deployment, copy `.env.public.example` to a private
+location such as `~/.config/conviction/public.env`, set a long unique
+`CONVICTION_AUTH_PASSWORD`, and load it in the process that starts Conviction.
+Set `CONVICTION_AUTH_ENABLED=1`; `CONVICTION_AUTH_USERNAME` selects the Basic Auth
+username. Basic Auth is opt-in: when enabled, browsers display their native Basic
+Authentication prompt before serving the app or its API. This documentation does
+not imply that any public deployment has been made.
 
 ---
 
@@ -149,8 +173,19 @@ Tickers are **Yahoo Finance symbols**:
 | Tokyo | `SYMBOL.T` | `7203.T` |
 | Crypto | `SYMBOL-USD` | `BTC-USD` |
 
-Environment variables: `PORT` (default 8080), `HOST` (default 0.0.0.0),
-`PORTFOLIO_DATA_DIR` (where config/DB/cache live; defaults to the app folder).
+Environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8080` | Listening port. |
+| `HOST` | `0.0.0.0` | Listening address; use `127.0.0.1` for a reverse-proxy or Cloudflare Tunnel deployment. |
+| `PORTFOLIO_DATA_DIR` | app folder | Directory for `config.json`, the price DB, and cache. |
+| `CONVICTION_AUTH_ENABLED` | unset/disabled | Set to `1` to enable HTTP Basic Authentication. |
+| `CONVICTION_AUTH_USERNAME` | — | Basic Auth username when authentication is enabled. |
+| `CONVICTION_AUTH_PASSWORD` | — | Basic Auth password when authentication is enabled; keep it only in a private environment file. |
+
+See `.env.public.example` for a non-secret public-deployment template. Never commit
+a real password or place one in `config.json`.
 
 ---
 
@@ -179,8 +214,11 @@ Environment variables: `PORT` (default 8080), `HOST` (default 0.0.0.0),
   heuristics for orientation — not investment recommendations. A buy signal does
   not mean the business is intact (structural/fundamental judgment is yours).
   Always do your own research.
-- **No authentication.** The app has no login. Bind to localhost or use a VPN.
-  Don't expose it to the public internet.
+- **Access control and exposure.** Private/Tailscale access is the default. Basic
+  Auth is opt-in via `CONVICTION_AUTH_ENABLED=1` plus private username/password
+  environment variables; it is not a substitute for TLS. A public deployment must
+  use a TLS reverse proxy or Cloudflare Tunnel and bind Conviction to localhost.
+  Never commit credentials or store them in `config.json`.
 
 ---
 

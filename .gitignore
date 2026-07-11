@@ -1,5 +1,10 @@
 # personal data — never commit
 config.json
+
+# Local environment files may contain deployment credentials.
+.env
+.env.*
+!.env.public.example
 prices.db*
 .cache.pkl
 
