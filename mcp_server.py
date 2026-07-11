@@ -8,6 +8,8 @@ still manages what's actually in the portfolio.
 
 Run: python mcp_server.py (stdio transport, for `hermes mcp add`)
 Env: CONVICTION_URL (default http://127.0.0.1:8080)
+     CONVICTION_AUTH_FILE (optional private KEY=VALUE file containing
+     CONVICTION_AUTH_USERNAME and CONVICTION_AUTH_PASSWORD)
 """
 
 import os
@@ -32,8 +34,44 @@ mcp = FastMCP(
 )
 
 
+def _auth_credentials() -> tuple[str, str] | None:
+    """Load optional HTTP Basic Auth credentials from the configured file.
+
+    The file is intentionally a small shell-style ``KEY=VALUE`` file: blank
+    lines and comments are ignored, and values are split only on their first
+    equals sign. It must be kept outside the repository and Hermes config.
+    """
+    auth_file = os.environ.get("CONVICTION_AUTH_FILE")
+    if not auth_file:
+        return None
+
+    values = {}
+    try:
+        with open(auth_file, encoding="utf-8") as file:
+            for line in file:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+    except OSError:
+        return None
+
+    username = values.get("CONVICTION_AUTH_USERNAME")
+    password = values.get("CONVICTION_AUTH_PASSWORD")
+    return (username, password) if username and password else None
+
+
+def _client() -> httpx.Client:
+    """Create the API client, adding Basic Auth only when configured."""
+    credentials = _auth_credentials()
+    if credentials:
+        return httpx.Client(timeout=30, auth=credentials)
+    return httpx.Client(timeout=30)
+
+
 def _get(path: str, **params):
-    with httpx.Client(timeout=30) as client:
+    with _client() as client:
         r = client.get(f"{BASE_URL}{path}", params=params)
         r.raise_for_status()
         return r.text if path.endswith("format=md") or params.get("format") == "md" else r.json()
@@ -47,7 +85,7 @@ def get_portfolio_summary(format: Literal["md", "json"] = "md") -> str:
     targets, distance to all-time high, and any existing agent thesis. Small
     (~4-10 KB), structured, and always current — no need to open the web UI
     and take a DOM snapshot to answer a portfolio question."""
-    with httpx.Client(timeout=30) as client:
+    with _client() as client:
         r = client.get(f"{BASE_URL}/api/summary", params={"format": format})
         r.raise_for_status()
         return r.text
@@ -85,7 +123,7 @@ def post_thesis(
     of the numbers. `author` should be your agent name (e.g. "wu", "real",
     "larry") so multiple agents' theses on the same ticker don't overwrite
     each other."""
-    with httpx.Client(timeout=30) as client:
+    with _client() as client:
         r = client.post(f"{BASE_URL}/api/thesis", json={
             "ticker": ticker, "verdict": verdict,
             "rationale": rationale, "author": author,
