@@ -30,12 +30,26 @@ Point your agent at it, let it reason about the signals, and close the loop:
 ```
 GET /api/summary?format=md    → feed to your LLM agent
   agent reasons about signals, fundamentals, context
-  agent posts a thesis back (POST /api/thesis — planned)
+  agent posts a thesis back (POST /api/thesis)
   human decides
 ```
 
 This is the design center: quant signals + agent qualitative analysis + human
 judgment = solidified decisions. The tracker is the cockpit, not the pilot.
+
+### MCP / Discord agents
+
+`mcp_server.py` exposes this deliberation loop as a local stdio MCP server.
+When registered in Hermes, its tools are automatically available to the
+configured Discord-agent profiles: `get_portfolio_summary`, `get_config`,
+`get_analyst_detail`, and `post_thesis`. The tools deliberately support reading
+signals and recording an agent thesis, **not** adding, removing, or trading
+positions.
+
+If the Conviction HTTP app uses Basic Auth, configure the MCP process with a
+private `CONVICTION_AUTH_FILE` that contains `CONVICTION_AUTH_USERNAME` and
+`CONVICTION_AUTH_PASSWORD`. Keep that file outside the repository and Hermes
+configuration; pass only its filesystem path in the MCP server's `env` mapping.
 
 ---
 
