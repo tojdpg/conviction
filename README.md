@@ -178,7 +178,7 @@ Environment variables:
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8080` | Listening port. |
-| `HOST` | `0.0.0.0` | Listening address; use `127.0.0.1` for a reverse-proxy or Cloudflare Tunnel deployment. |
+| `HOST` | `127.0.0.1` | Listening address; use `127.0.0.1` for a reverse-proxy or Cloudflare Tunnel deployment. |
 | `PORTFOLIO_DATA_DIR` | app folder | Directory for `config.json`, the price DB, and cache. |
 | `CONVICTION_AUTH_ENABLED` | unset/disabled | Set to `1` to enable HTTP Basic Authentication. |
 | `CONVICTION_AUTH_USERNAME` | — | Basic Auth username when authentication is enabled. |

@@ -37,6 +37,21 @@ def test_auth_enabled_rejects_missing_and_wrong_credentials(monkeypatch):
     assert wrong.headers["www-authenticate"] == "Basic"
 
 
+def test_auth_enabled_protects_generated_documentation_routes(monkeypatch):
+    monkeypatch.setenv("CONVICTION_AUTH_ENABLED", "true")
+    monkeypatch.setenv("CONVICTION_AUTH_USERNAME", "test-user")
+    monkeypatch.setenv("CONVICTION_AUTH_PASSWORD", "test-password")
+    client = TestClient(main.app)
+
+    for path in ("/openapi.json", "/docs", "/redoc"):
+        denied = client.get(path)
+        allowed = client.get(path, headers=_basic_auth("test-user", "test-password"))
+
+        assert denied.status_code == 401
+        assert denied.headers["www-authenticate"] == "Basic"
+        assert allowed.status_code == 200
+
+
 def test_auth_enabled_without_configured_password_fails_closed(monkeypatch):
     monkeypatch.setenv("CONVICTION_AUTH_ENABLED", "on")
     monkeypatch.setenv("CONVICTION_AUTH_USERNAME", "test-user")

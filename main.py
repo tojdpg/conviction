@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -72,8 +73,29 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(lifespan=lifespan, dependencies=[Depends(_require_basic_auth)])
+app = FastAPI(
+    lifespan=lifespan,
+    dependencies=[Depends(_require_basic_auth)],
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 md.init_db()
+
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_schema():
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False)
+def swagger_ui():
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{app.title} - Swagger UI")
+
+
+@app.get("/redoc", include_in_schema=False)
+def redoc_ui():
+    return get_redoc_html(openapi_url="/openapi.json", title=f"{app.title} - ReDoc")
 
 
 def _base_money_fields(kind, amount):
