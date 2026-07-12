@@ -16,3 +16,7 @@ data/
 HANDOVER.md
 RELEASE_PLAN.md
 .worktrees/
+
+# agent theses on the real depot + stray runtime dirs — never commit
+theses.json
+.hermes/
